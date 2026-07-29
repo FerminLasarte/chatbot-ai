@@ -121,7 +121,11 @@ async def _handle(
                 raise RuntimeError(f"el tenant {tenant_id} desaparecio entre el claim y el handle")
 
             try:
-                reply = await answer(db, tenant, text)
+                # La conversacion se reanuda por el numero del usuario final,
+                # dentro de la ventana de inactividad configurada.
+                reply, _conversacion = await answer(
+                    db, tenant, text, channel="whatsapp", external_id=to_number
+                )
             except QuotaExcedida:
                 # No es un error: es politica. Se procesó, y el evento queda
                 # 'done' para que no se reintente. Al usuario final no se le

@@ -10,6 +10,7 @@ from fastapi.responses import JSONResponse
 from app.api.v1.routes import chat, knowledge, tenants, webhooks
 from app.core.config import settings
 from app.core.logging import setup_logging
+from app.services.conversation import ConversacionAjena
 from app.services.quota import QuotaExcedida
 
 
@@ -48,6 +49,15 @@ async def _quota_excedida(request: Request, exc: QuotaExcedida) -> JSONResponse:
             "limit": exc.limite,
             "period": exc.periodo,
         },
+    )
+
+
+@app.exception_handler(ConversacionAjena)
+async def _conversacion_ajena(request: Request, exc: ConversacionAjena) -> JSONResponse:
+    """404 y no 403: no confirmamos que la conversacion exista para otro cliente."""
+    return JSONResponse(
+        status_code=status.HTTP_404_NOT_FOUND,
+        content={"detail": "conversacion no encontrada"},
     )
 
 

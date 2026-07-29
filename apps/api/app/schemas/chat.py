@@ -1,6 +1,7 @@
 """Contratos de entrada/salida de la API."""
 
 from datetime import datetime
+from uuid import UUID
 
 from pydantic import BaseModel, Field
 
@@ -9,7 +10,9 @@ from app.models.api_key import Scope
 
 class ChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=4000)
-    conversation_id: str | None = None
+    # Si no viene, se abre una conversacion nueva. Tipado como UUID para que un
+    # valor invalido de 422 en el borde, antes de llegar a la base.
+    conversation_id: UUID | None = None
 
 
 class ChatResponse(BaseModel):

@@ -137,6 +137,74 @@ uv run python -m app.cli crear-clave-admin --nombre "laptop de fermin"
 > agrega una tabla `users` y sesiones **encima** de esto; las API keys siguen
 > siendo la via para el widget y las integraciones.
 
+## Memoria conversacional
+
+Sin memoria, un "¿y el precio?" despues de "¿tenes turno el martes?" llega sin
+contexto y el bot parece tonto.
+
+### Que se guarda y que no
+
+Se persiste el **texto plano** del usuario y de la respuesta. **No** se guarda el
+turno con el contexto RAG inyectado, por dos razones:
+
+- Al replicar la historia se reenviaria contexto viejo, recuperado para *otra*
+  pregunta. Confunde al modelo mas de lo que ayuda.
+- El costo creceria sin techo: cada turno arrastraria los fragmentos de todos los
+  turnos anteriores.
+
+El contexto se recupera fresco para la pregunta actual, en cada turno.
+
+### El orden se guarda explicito, no se deduce del timestamp
+
+`messages.position` es un entero por conversacion. **No alcanza ordenar por
+`created_at`**: `now()` en Postgres devuelve el instante de *inicio de la
+transaccion*, asi que dos mensajes escritos en la misma transaccion comparten
+timestamp exacto y su orden relativo queda indefinido. Un historial desordenado
+le da al modelo un dialogo que nunca ocurrio.
+
+Hoy cada mensaje se commitea por separado, asi que `created_at` alcanzaria — pero
+`position` no depende de ese detalle. Hay un test que inserta dos mensajes en una
+sola transaccion y verifica que el orden se mantiene.
+
+La posicion se calcula dentro de la misma sentencia del INSERT
+(`SELECT COALESCE(MAX(position),0)+1`): leerla antes y usarla despues tendria una
+carrera entre dos mensajes simultaneos del mismo hilo.
+
+### Identidad del hilo
+
+| Canal | Identidad | Reanuda |
+| --- | --- | --- |
+| WhatsApp | `(tenant, canal, numero del usuario final)` | dentro de la ventana de inactividad |
+| Widget web | el `conversation_id` que devuelve la API | mientras el cliente lo mande |
+
+**★ El `conversation_id` del widget viaja en el navegador.** `_reanudar_por_id`
+filtra por `tenant_id` sin excepcion: sin eso, quien consiga el id de una
+conversacion de otro cliente podria reanudarla y leerle el historial en la
+respuesta del modelo. Un id inexistente o ajeno devuelve **404, no 403** — no
+confirmamos que exista para otro cliente.
+
+### Ventana de inactividad
+
+`conversation_idle_minutes` (24 h por defecto, que coincide con la ventana de
+atencion al cliente de WhatsApp). Pasado ese tiempo se abre un hilo nuevo, en vez
+de reabrir uno con historia rancia y pagar por replicarla.
+
+### Cuanta historia
+
+`conversation_history_messages` (10 por defecto: ~5 intercambios). **Es la palanca
+directa del costo por mensaje** — cada turno reenvia toda esa historia como input.
+
+El recorte descarta un `assistant` que quede primero: la API exige que el
+historial arranque con un turno de usuario.
+
+Se coloca un breakpoint de cache sobre la cola de la historia. Con el prefijo de
+tools + system solo (~326 tokens) no se llega al minimo de 512 de Opus 5 y no
+cachea nada; con historia suficiente, ese breakpoint si empieza a acertar.
+
+> **Pendiente: retencion.** Guardar historial significa guardar mensajes de los
+> clientes finales de las pymes. Falta una politica de borrado (y el comando para
+> ejecutarla) antes de operar con datos reales.
+
 ## Cuotas
 
 Con precio plano a pymes, un cliente sin tope se puede comer la ganancia del mes.

@@ -197,7 +197,7 @@ async def test_si_falla_el_llm_no_propaga_registra_y_avisa_al_usuario(
     """
     enviados: list[str] = []
 
-    async def llm_caido(*args: object, **kwargs: object) -> str:
+    async def llm_caido(*args: object, **kwargs: object) -> tuple[str, uuid.UUID]:
         raise RuntimeError("Anthropic devolvio 529 overloaded")
 
     async def capturar_envio(*, to: str, text: str, phone_number_id: str) -> None:
@@ -227,8 +227,8 @@ async def test_camino_feliz_marca_done_y_responde(
 ) -> None:
     enviados: list[str] = []
 
-    async def llm_ok(*args: object, **kwargs: object) -> str:
-        return "Hola! Atendemos de 9 a 18."
+    async def llm_ok(*args: object, **kwargs: object) -> tuple[str, uuid.UUID]:
+        return "Hola! Atendemos de 9 a 18.", uuid.uuid4()
 
     async def capturar_envio(*, to: str, text: str, phone_number_id: str) -> None:
         enviados.append(text)
@@ -255,8 +255,8 @@ async def test_si_falla_el_envio_no_se_marca_como_done(
 ) -> None:
     """Generar la respuesta y no poder entregarla NO es un exito."""
 
-    async def llm_ok(*args: object, **kwargs: object) -> str:
-        return "respuesta que nunca llega"
+    async def llm_ok(*args: object, **kwargs: object) -> tuple[str, uuid.UUID]:
+        return "respuesta que nunca llega", uuid.uuid4()
 
     intentos: list[str] = []
 
