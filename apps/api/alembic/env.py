@@ -18,13 +18,12 @@ from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
+# app.models re-exporta TODOS los modelos. Si uno no llega hasta aca,
+# --autogenerate no lo ve y genera un DROP de esa tabla.
+import app.models  # noqa: F401
 from alembic import context
 from app.core.config import settings
-
-# Importar Base y TODOS los modelos: si un modelo no se importa aca,
-# --autogenerate no lo ve y lo trata como una tabla a borrar.
 from app.db.session import Base
-from app.models import tenant as _tenant_models  # noqa: F401
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.database_url)

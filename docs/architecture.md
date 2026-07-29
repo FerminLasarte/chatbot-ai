@@ -81,6 +81,51 @@ La respuesta del bot no cambia segun el canal. Cuando aparezca Instagram o un
 widget web, se agrega una carpeta al lado en vez de meter `if channel == "whatsapp"`
 en medio del servicio de conversacion.
 
+## Garantias del webhook
+
+Meta reintenta las entregas y espera un 200 rapido. De ahi salen dos requisitos
+que el codigo tiene que cumplir, y que estan cubiertos por tests que se
+verificaron rompiendo el arreglo a proposito.
+
+### Idempotencia por reclamo atomico
+
+Cada mensaje entrante se "reclama" en `processed_events` antes de procesarse:
+
+```sql
+INSERT INTO processed_events (channel, external_id, ...)
+VALUES (...) ON CONFLICT DO NOTHING RETURNING id
+```
+
+Si no devuelve fila, otro proceso ya lo tomo: es una reentrega y se ignora.
+
+**No usar `SELECT` y despues `INSERT`.** Dos entregas simultaneas del mismo
+mensaje verian ambas "no existe" y las dos procesarian. La unicidad es sobre
+`(channel, external_id)`, no sobre `external_id` solo: distintos canales pueden
+usar el mismo ID.
+
+### Ningun fallo silencioso
+
+Le respondemos 200 a Meta enseguida, asi que el trabajo real ocurre en un
+`BackgroundTasks`. Si algo falla ahi, Meta **ya no va a reintentar**. Por eso
+`_handle` es una frontera de la que no puede escapar ninguna excepcion:
+
+- El error queda en `processed_events.status = 'failed'` con el detalle, para
+  poder encontrarlo (`WHERE status = 'failed'`) y reintentarlo.
+- El usuario recibe un mensaje de cortesia. Un silencio es indistinguible de que
+  el bot lo ignore.
+- Generar la respuesta pero no poder entregarla **no** cuenta como exito: si
+  `send_text` falla, el evento queda `failed`.
+
+Los reintentos de fallos transitorios (red, 429, 5xx) viven en
+`core/retry.py`, con backoff exponencial y jitter. Los 4xx no se reintentan:
+un 401 no mejora por insistir. El SDK de Anthropic ya trae los suyos.
+
+> **Limite conocido:** `BackgroundTasks` vive en el proceso. Si el contenedor se
+> reinicia entre el 200 y el fin del procesamiento, ese mensaje queda en
+> `pending` para siempre. Es visible y reintentable a mano, pero cuando el
+> volumen lo justifique hay que mover esto a una cola real (Redis ya esta en el
+> compose para eso).
+
 ## Orden del prompt y prompt caching
 
 El caching de Anthropic es un match de **prefijo**: cualquier byte que cambie

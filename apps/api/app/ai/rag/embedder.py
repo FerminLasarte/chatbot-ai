@@ -13,6 +13,7 @@ from typing import Protocol
 import httpx
 
 from app.core.config import settings
+from app.core.retry import with_retry
 
 VOYAGE_URL = "https://api.voyageai.com/v1/embeddings"
 
@@ -29,15 +30,19 @@ class VoyageEmbedder:
             # Voyage distingue query de documento; mejora notablemente el recall.
             "input_type": "query" if is_query else "document",
         }
-        async with httpx.AsyncClient(timeout=30) as client:
-            resp = await client.post(
-                VOYAGE_URL,
-                json=payload,
-                headers={"Authorization": f"Bearer {settings.voyage_api_key}"},
-            )
-            resp.raise_for_status()
-            data = resp.json()["data"]
-        return [item["embedding"] for item in sorted(data, key=lambda d: d["index"])]
+
+        async def _call() -> list[list[float]]:
+            async with httpx.AsyncClient(timeout=30) as client:
+                resp = await client.post(
+                    VOYAGE_URL,
+                    json=payload,
+                    headers={"Authorization": f"Bearer {settings.voyage_api_key}"},
+                )
+                resp.raise_for_status()
+                data = resp.json()["data"]
+            return [item["embedding"] for item in sorted(data, key=lambda d: d["index"])]
+
+        return await with_retry(_call, descripcion="embeddings de Voyage")
 
 
 def get_embedder() -> Embedder:

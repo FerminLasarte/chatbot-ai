@@ -5,20 +5,24 @@ import logging
 import httpx
 
 from app.core.config import settings
+from app.core.retry import with_retry
 
 logger = logging.getLogger(__name__)
 
 
-async def send_text(to: str, text: str, phone_number_id: str | None = None) -> None:
+class WhatsAppSendError(Exception):
+    """No se pudo entregar el mensaje al usuario final."""
+
+
+async def send_text(to: str, text: str, phone_number_id: str) -> None:
     """Envia un mensaje de texto.
 
-    TODO: el access token y el phone_number_id son por tenant — moverlos a la
-    tabla `tenants` (cifrados) en vez de a settings globales.
-    """
-    if not phone_number_id:
-        logger.warning("send_text sin phone_number_id: no se envio nada")
-        return
+    Levanta excepcion si no se pudo entregar: quien llama necesita saberlo para
+    no marcar el mensaje como procesado con exito.
 
+    TODO: el access token es por tenant — moverlo a la tabla `tenants` (cifrado)
+    en vez de a settings globales.
+    """
     url = f"https://graph.facebook.com/{settings.whatsapp_api_version}/{phone_number_id}/messages"
     payload = {
         "messaging_product": "whatsapp",
@@ -27,7 +31,15 @@ async def send_text(to: str, text: str, phone_number_id: str | None = None) -> N
         "text": {"body": text},
     }
 
-    async with httpx.AsyncClient(timeout=20) as client:
-        resp = await client.post(url, json=payload)
-        if resp.is_error:
-            logger.error("fallo el envio a WhatsApp: %s %s", resp.status_code, resp.text)
+    async def _call() -> None:
+        async with httpx.AsyncClient(timeout=20) as client:
+            resp = await client.post(url, json=payload)
+            resp.raise_for_status()
+
+    try:
+        await with_retry(_call, descripcion="envio a WhatsApp")
+    except httpx.HTTPStatusError as exc:
+        # 4xx no reintentable: numero invalido, ventana de 24h cerrada, token vencido.
+        raise WhatsAppSendError(
+            f"Meta rechazo el envio ({exc.response.status_code}): {exc.response.text[:500]}"
+        ) from exc
