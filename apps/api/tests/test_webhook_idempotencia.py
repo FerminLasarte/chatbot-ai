@@ -11,28 +11,16 @@ from collections.abc import AsyncIterator
 import httpx
 import pytest
 import pytest_asyncio
-from sqlalchemy import delete, select, text
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.routes import webhooks
 from app.channels.whatsapp.client import WhatsAppSendError
 from app.core.retry import RetryableHTTPError, with_retry
-from app.db.session import SessionLocal, engine
+from app.db.session import SessionLocal
 from app.models.event import EventStatus, ProcessedEvent
 from app.models.tenant import Tenant
 from app.services import inbox
-
-
-@pytest_asyncio.fixture
-async def db() -> AsyncIterator[AsyncSession]:
-    try:
-        async with engine.connect() as conn:
-            await conn.execute(text("SELECT 1"))
-    except Exception as exc:  # noqa: BLE001
-        pytest.skip(f"Postgres no disponible ({type(exc).__name__}); levanta docker compose")
-
-    async with SessionLocal() as session:
-        yield session
 
 
 @pytest_asyncio.fixture

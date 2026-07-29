@@ -11,6 +11,7 @@ Notas de la API vigente:
 """
 
 import logging
+from dataclasses import dataclass
 
 from anthropic import AsyncAnthropic
 from anthropic.types import MessageParam, OutputConfigParam, TextBlockParam
@@ -22,11 +23,24 @@ logger = logging.getLogger(__name__)
 _client = AsyncAnthropic(api_key=settings.anthropic_api_key or None)
 
 
+RECHAZO = "Perdon, no puedo ayudarte con eso. Si queres te derivo con alguien del equipo."
+
+
+@dataclass(frozen=True)
+class Respuesta:
+    """Texto mas consumo. El consumo se necesita para facturar y medir cuota."""
+
+    text: str
+    input_tokens: int = 0
+    output_tokens: int = 0
+    cache_read_tokens: int = 0
+
+
 async def complete(
     system_blocks: list[TextBlockParam],
     messages: list[MessageParam],
     max_tokens: int | None = None,
-) -> str:
+) -> Respuesta:
     """Una respuesta de texto. Streaming para no chocar con timeouts HTTP."""
     output_config = OutputConfigParam(effort=settings.llm_effort)  # type: ignore[typeddict-item]
     async with _client.messages.stream(
@@ -38,21 +52,26 @@ async def complete(
     ) as stream:
         response = await stream.get_final_message()
 
+    usage = response.usage
+    consumo = {
+        "input_tokens": usage.input_tokens,
+        "output_tokens": usage.output_tokens,
+        "cache_read_tokens": usage.cache_read_input_tokens or 0,
+    }
+
     # Los clasificadores de seguridad pueden declinar: HTTP 200 con stop_reason
     # "refusal" y `content` vacio. Hay que chequearlo ANTES de leer content.
+    # Igual se devuelve el consumo: el rechazo tambien se paga.
     if response.stop_reason == "refusal":
         logger.warning("respuesta rechazada por clasificadores de seguridad")
-        return "Perdon, no puedo ayudarte con eso. Si queres te derivo con alguien del equipo."
+        return Respuesta(text=RECHAZO, **consumo)
 
-    usage = response.usage
     logger.info(
         "llm ok",
-        extra={
-            "cache_read": usage.cache_read_input_tokens,
-            "cache_write": usage.cache_creation_input_tokens,
-            "input": usage.input_tokens,
-            "output": usage.output_tokens,
-        },
+        extra={**consumo, "cache_write": usage.cache_creation_input_tokens},
     )
 
-    return "".join(b.text for b in response.content if b.type == "text").strip()
+    return Respuesta(
+        text="".join(b.text for b in response.content if b.type == "text").strip(),
+        **consumo,
+    )

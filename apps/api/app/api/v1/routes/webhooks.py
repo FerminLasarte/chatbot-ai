@@ -28,6 +28,7 @@ from app.db.session import SessionLocal
 from app.models.tenant import Tenant
 from app.services import inbox
 from app.services.conversation import answer
+from app.services.quota import QuotaExcedida
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
@@ -35,6 +36,12 @@ router = APIRouter(prefix="/webhooks", tags=["webhooks"])
 MENSAJE_DE_CORTESIA = (
     "Perdon, tuve un problema tecnico y no pude procesar tu mensaje. "
     "Podes escribirme de nuevo en un momento."
+)
+
+# El usuario final no tiene por que enterarse de que el negocio agoto su cuota.
+MENSAJE_SIN_CUOTA = (
+    "En este momento no puedo responderte automaticamente. "
+    "Alguien del equipo te va a contactar a la brevedad."
 )
 
 
@@ -113,7 +120,22 @@ async def _handle(
             if tenant is None:
                 raise RuntimeError(f"el tenant {tenant_id} desaparecio entre el claim y el handle")
 
-            reply = await answer(db, tenant, text)
+            try:
+                reply = await answer(db, tenant, text)
+            except QuotaExcedida:
+                # No es un error: es politica. Se procesó, y el evento queda
+                # 'done' para que no se reintente. Al usuario final no se le
+                # cuenta que el negocio se quedo sin cuota.
+                logger.warning(
+                    "mensaje no atendido por cuota agotada",
+                    extra={"tenant_id": str(tenant_id)},
+                )
+                await send_text(
+                    to=to_number, text=MENSAJE_SIN_CUOTA, phone_number_id=phone_number_id
+                )
+                await inbox.mark_done(db, event_id)
+                return
+
             await send_text(to=to_number, text=reply, phone_number_id=phone_number_id)
             await inbox.mark_done(db, event_id)
 

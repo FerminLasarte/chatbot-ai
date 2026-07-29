@@ -12,6 +12,7 @@ from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import select
 
 from app.api.v1.deps import AdminKey, CurrentTenant, DbSession, TenantKey
+from app.core.config import settings
 from app.core.security import generate_api_key
 from app.models.api_key import ApiKey, Scope
 from app.models.tenant import Tenant
@@ -19,10 +20,13 @@ from app.schemas.chat import (
     ApiKeyCreate,
     ApiKeyCreated,
     ApiKeyRead,
+    LimitUpdate,
     PromptUpdate,
     TenantCreate,
     TenantRead,
+    UsageRead,
 )
+from app.services import quota
 
 router = APIRouter(prefix="/tenants", tags=["tenants"])
 
@@ -34,7 +38,52 @@ def _to_read(t: Tenant) -> TenantRead:
         name=t.name,
         system_prompt=t.system_prompt,
         is_active=t.is_active,
+        monthly_message_limit=t.monthly_message_limit,
     )
+
+
+# ---------------------------------------------------------------------------
+# Operaciones del propio cliente
+#
+# ORDEN IMPORTANTE: estas rutas literales (/me, /me/usage) van ANTES que las
+# parametrizadas (/{tenant_id}/...). FastAPI matchea en orden de declaracion:
+# si /{tenant_id}/usage se declara primero, una peticion a /me/usage entra por
+# ahi con tenant_id='me' y pide clave admin, devolviendo 403 al cliente.
+# ---------------------------------------------------------------------------
+
+
+def _to_usage(c: quota.Consumo) -> UsageRead:
+    return UsageRead(
+        period=c.period,
+        messages=c.messages,
+        limit=c.limit,
+        remaining=c.remaining,
+        input_tokens=c.input_tokens,
+        output_tokens=c.output_tokens,
+        cache_read_tokens=c.cache_read_tokens,
+    )
+
+
+@router.get("/me", response_model=TenantRead)
+async def read_me(tenant: CurrentTenant, _: TenantKey) -> TenantRead:
+    return _to_read(tenant)
+
+
+@router.get("/me/usage", response_model=UsageRead)
+async def read_my_usage(tenant: CurrentTenant, db: DbSession, _: TenantKey) -> UsageRead:
+    """El cliente ve su consumo, pero no puede cambiar su limite."""
+    return _to_usage(await quota.consumo_actual(db, tenant))
+
+
+@router.patch("/me/prompt", response_model=TenantRead)
+async def update_prompt(
+    payload: PromptUpdate, tenant: CurrentTenant, db: DbSession, _: TenantKey
+) -> TenantRead:
+    """Editar el System Prompt del cliente. Sin deploy: es una fila en la DB."""
+    tenant.system_prompt = payload.system_prompt
+    await db.commit()
+    await db.refresh(tenant)
+    return _to_read(tenant)
 
 
 # ---------------------------------------------------------------------------
@@ -47,7 +96,12 @@ async def create_tenant(payload: TenantCreate, db: DbSession, _: AdminKey) -> Te
     if await db.scalar(select(Tenant).where(Tenant.slug == payload.slug)):
         raise HTTPException(status.HTTP_409_CONFLICT, "ya existe un cliente con ese slug")
 
-    tenant = Tenant(**payload.model_dump())
+    datos = payload.model_dump()
+    # Nunca crear un cliente sin tope: con precio plano, eso deja el margen
+    # expuesto desde el minuto cero.
+    if datos.get("monthly_message_limit") is None:
+        datos["monthly_message_limit"] = settings.default_monthly_message_limit
+    tenant = Tenant(**datos)
     db.add(tenant)
     await db.commit()
     await db.refresh(tenant)
@@ -130,22 +184,24 @@ async def revoke_key(tenant_id: uuid.UUID, key_id: uuid.UUID, db: DbSession, _: 
     await db.commit()
 
 
-# ---------------------------------------------------------------------------
-# Operaciones del propio cliente
-# ---------------------------------------------------------------------------
-
-
-@router.get("/me", response_model=TenantRead)
-async def read_me(tenant: CurrentTenant, _: TenantKey) -> TenantRead:
-    return _to_read(tenant)
-
-
-@router.patch("/me/prompt", response_model=TenantRead)
-async def update_prompt(
-    payload: PromptUpdate, tenant: CurrentTenant, db: DbSession, _: TenantKey
+@router.patch("/{tenant_id}/limit", response_model=TenantRead)
+async def update_limit(
+    tenant_id: uuid.UUID, payload: LimitUpdate, db: DbSession, _: AdminKey
 ) -> TenantRead:
-    """Editar el System Prompt del cliente. Sin deploy: es una fila en la DB."""
-    tenant.system_prompt = payload.system_prompt
+    """Ajusta la cuota mensual. Solo la agencia: el cliente no se sube el techo."""
+    tenant = await db.get(Tenant, tenant_id)
+    if tenant is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "cliente no encontrado")
+
+    tenant.monthly_message_limit = payload.monthly_message_limit
     await db.commit()
     await db.refresh(tenant)
     return _to_read(tenant)
+
+
+@router.get("/{tenant_id}/usage", response_model=UsageRead)
+async def read_usage_admin(tenant_id: uuid.UUID, db: DbSession, _: AdminKey) -> UsageRead:
+    tenant = await db.get(Tenant, tenant_id)
+    if tenant is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "cliente no encontrado")
+    return _to_usage(await quota.consumo_actual(db, tenant))

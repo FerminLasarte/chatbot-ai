@@ -31,6 +31,23 @@ class TenantRead(BaseModel):
     name: str
     system_prompt: str
     is_active: bool
+    monthly_message_limit: int | None
+
+
+class LimitUpdate(BaseModel):
+    """None = sin limite. Con precio plano eso deja el margen expuesto."""
+
+    monthly_message_limit: int | None = Field(default=None, ge=0)
+
+
+class UsageRead(BaseModel):
+    period: str
+    messages: int
+    limit: int | None
+    remaining: int | None
+    input_tokens: int
+    output_tokens: int
+    cache_read_tokens: int
 
 
 class PromptUpdate(BaseModel):

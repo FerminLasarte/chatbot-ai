@@ -12,26 +12,14 @@ from datetime import UTC, datetime, timedelta
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import delete, select, text
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.routes import chat as chat_route
 from app.core.security import generate_api_key, hash_api_key, verify_api_key
-from app.db.session import SessionLocal, engine
 from app.main import app
 from app.models.api_key import ApiKey, Scope
 from app.models.tenant import Tenant
-
-
-@pytest_asyncio.fixture
-async def db() -> AsyncIterator[AsyncSession]:
-    try:
-        async with engine.connect() as conn:
-            await conn.execute(text("SELECT 1"))
-    except Exception as exc:  # noqa: BLE001
-        pytest.skip(f"Postgres no disponible ({type(exc).__name__}); levanta docker compose")
-    async with SessionLocal() as session:
-        yield session
 
 
 @pytest_asyncio.fixture

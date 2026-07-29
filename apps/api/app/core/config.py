@@ -31,6 +31,11 @@ class Settings(BaseSettings):
     embeddings_model: str = "voyage-3"
     embeddings_dim: int = 1024
 
+    # --- Cuotas ---
+    # Valor con el que nace cada cliente nuevo. Se puede ajustar por cliente
+    # despues; esto es solo el default para no crear nunca uno sin tope.
+    default_monthly_message_limit: int = 2000
+
     # --- RAG ---
     chunk_size: int = 800
     chunk_overlap: int = 120

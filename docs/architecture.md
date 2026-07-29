@@ -137,6 +137,61 @@ uv run python -m app.cli crear-clave-admin --nombre "laptop de fermin"
 > agrega una tabla `users` y sesiones **encima** de esto; las API keys siguen
 > siendo la via para el widget y las integraciones.
 
+## Cuotas
+
+Con precio plano a pymes, un cliente sin tope se puede comer la ganancia del mes.
+Y la clave del widget viaja en el navegador: filtrada y puesta en un loop, quema
+presupuesto de la agencia, no del cliente.
+
+**Cuota y rate limiting no son lo mismo.** La cuota acota *cuanto* se gasta en
+total (protege el margen); el rate limiting acota *que tan rapido* (protege
+contra abuso y loops). Implementado hoy: solo la cuota.
+
+### Chequeo e incremento son una sola sentencia
+
+```sql
+INSERT INTO tenant_usage (tenant_id, period, messages) VALUES (:t, :p, 1)
+ON CONFLICT (tenant_id, period)
+  DO UPDATE SET messages = tenant_usage.messages + 1
+  WHERE tenant_usage.messages < :limite
+RETURNING messages
+```
+
+Si no devuelve fila, la cuota esta agotada.
+
+**No usar `leer contador -> decidir -> incrementar`.** Con la cuota en 1999/2000,
+veinte peticiones simultaneas leen todas 1999, todas concluyen que hay lugar, y
+terminas con 2019 mensajes cobrados. Hay un test que corre 20 peticiones
+concurrentes contra un limite de 5: la version ingenua **pasa todos los tests
+secuenciales** y falla solo ese.
+
+### La cuota frena ANTES de gastar
+
+`services/conversation.answer()` llama a `quota.consumir_mensaje()` como primera
+linea, antes del retriever y del LLM. Si contara el consumo despues, la cuota no
+protegeria nada: ya habrias pagado los embeddings y los tokens del mensaje que
+rechazas. Hay un test que espia el cliente del LLM y verifica que el mensaje
+rechazado nunca llega a el.
+
+### Configuracion
+
+`tenants.monthly_message_limit`: entero, o `NULL` para sin limite. Un cliente
+nuevo nunca nace sin tope — se completa con `settings.default_monthly_message_limit`.
+La migracion que introdujo la columna incluye un backfill por el mismo motivo:
+sin el, todos los clientes existentes habrian quedado ilimitados justo en la
+migracion que agrega las cuotas.
+
+Solo la agencia (`admin`) cambia limites. El cliente ve su consumo en
+`GET /tenants/me/usage` pero no se puede subir el techo.
+
+Los tokens se acumulan aparte (`input`/`output`/`cache_read`) para facturar y
+medir. No frenan nada: cuotear y facturar son ejes distintos.
+
+> **Pendiente: rate limiting.** La cuota acota la perdida total, pero un loop
+> puede quemarla en una hora. Falta un limite por minuto, que necesita Redis
+> (ya esta en el compose, sin usar) y una decision de que hacer si Redis se cae:
+> fail-open deja pasar todo, fail-closed corta el servicio.
+
 ## Garantias del webhook
 
 Meta reintenta las entregas y espera un 200 rapido. De ahi salen dos requisitos

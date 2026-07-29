@@ -15,12 +15,11 @@ from collections.abc import AsyncIterator
 
 import pytest
 import pytest_asyncio
-from sqlalchemy import delete, text
+from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.rag import retriever
 from app.core.config import settings
-from app.db.session import SessionLocal, engine
 from app.models.tenant import Chunk, Document, Tenant
 
 DIM = settings.embeddings_dim
@@ -74,18 +73,6 @@ class _EmbedderFalso:
 
     async def embed(self, texts: list[str], *, is_query: bool = False) -> list[list[float]]:
         return [self._vector for _ in texts]
-
-
-@pytest_asyncio.fixture
-async def db() -> AsyncIterator[AsyncSession]:
-    try:
-        async with engine.connect() as conn:
-            await conn.execute(text("SELECT 1"))
-    except Exception as exc:  # noqa: BLE001
-        pytest.skip(f"Postgres no disponible ({type(exc).__name__}); levanta docker compose")
-
-    async with SessionLocal() as session:
-        yield session
 
 
 @pytest_asyncio.fixture
