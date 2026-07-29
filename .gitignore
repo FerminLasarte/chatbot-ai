@@ -1,0 +1,153 @@
+# ═══════════════ Secretos y entorno ═══════════════
+# Regla de oro: ignorar TODO .env, permitir solo los .example
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.local
+
+# Credenciales, certificados, claves
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.jks
+credentials.json
+service-account*.json
+gcp-*.json
+secrets/
+.secrets/
+*_rsa
+*_dsa
+*_ed25519
+
+# ═══════════════ Python / FastAPI ═══════════════
+.venv/
+venv/
+env/
+ENV/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib64/
+parts/
+sdist/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Testing y calidad
+.pytest_cache/
+.mypy_cache/
+.dmypy.json
+.ruff_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.tox/
+.nox/
+.hypothesis/
+
+# Jupyter / notebooks de experimentacion
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# ═══════════════ IA / RAG ═══════════════
+# Indices vectoriales, embeddings cacheados y modelos: pesados y regenerables
+chroma_db/
+.chroma/
+faiss_index/
+*.faiss
+*.index
+vector_store/
+embeddings_cache/
+.cache/huggingface/
+models/
+*.gguf
+*.safetensors
+*.bin
+
+# Documentos de clientes subidos a la base de conocimiento (datos de terceros)
+uploads/
+storage/
+data/tenants/
+data/raw/
+
+# ═══════════════ Node / Next.js ═══════════════
+node_modules/
+.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/releases
+!.yarn/versions
+
+.next/
+out/
+.turbo/
+.swc/
+
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Deploy
+.vercel
+.netlify
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# ═══════════════ Infra / DB ═══════════════
+*.sqlite
+*.sqlite3
+*.db
+docker-compose.override.yml
+.docker/
+volumes/
+pgdata/
+
+# ═══════════════ Logs y temporales ═══════════════
+logs/
+*.log
+tmp/
+temp/
+*.tmp
+*.bak
+*.pid
+*.seed
+
+# ═══════════════ Sistema operativo ═══════════════
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# ═══════════════ Editores ═══════════════
+.idea/
+*.swp
+*.swo
+*~
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/launch.json
