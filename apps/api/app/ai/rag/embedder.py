@@ -22,8 +22,19 @@ class Embedder(Protocol):
     async def embed(self, texts: list[str], *, is_query: bool = False) -> list[list[float]]: ...
 
 
+class EmbeddingsNoConfigurado(Exception):
+    """Falta la credencial del proveedor de embeddings."""
+
+
 class VoyageEmbedder:
     async def embed(self, texts: list[str], *, is_query: bool = False) -> list[list[float]]:
+        # Falla rapido: sin clave el header sale vacio y httpx lo rechaza como
+        # error de transporte, que `with_retry` interpretaria como transitorio y
+        # reintentaria 3 veces con backoff. Un problema de configuracion no
+        # mejora por insistir.
+        if not settings.voyage_api_key:
+            raise EmbeddingsNoConfigurado("VOYAGE_API_KEY esta vacia: completala en apps/api/.env")
+
         payload = {
             "input": texts,
             "model": settings.embeddings_model,

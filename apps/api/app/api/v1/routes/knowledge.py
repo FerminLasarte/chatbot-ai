@@ -6,7 +6,7 @@ from fastapi import APIRouter, File, UploadFile, status
 from sqlalchemy import func, select
 
 from app.ai.rag.ingest import ingest_document
-from app.api.v1.deps import CurrentTenant, DbSession
+from app.api.v1.deps import CurrentTenant, DbSession, TenantKey
 from app.models.tenant import Chunk, Document
 from app.schemas.chat import DocumentRead
 
@@ -18,6 +18,7 @@ async def upload_document(
     tenant: CurrentTenant,
     db: DbSession,
     file: Annotated[UploadFile, File()],
+    _: TenantKey,
 ) -> DocumentRead:
     """Sube un .txt/.md y lo indexa.
 
@@ -35,7 +36,7 @@ async def upload_document(
 
 
 @router.get("/documents", response_model=list[DocumentRead])
-async def list_documents(tenant: CurrentTenant, db: DbSession) -> list[DocumentRead]:
+async def list_documents(tenant: CurrentTenant, db: DbSession, _: TenantKey) -> list[DocumentRead]:
     stmt = (
         select(Document, func.count(Chunk.id))
         .outerjoin(Chunk, Chunk.document_id == Document.id)

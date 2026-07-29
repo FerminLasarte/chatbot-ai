@@ -81,6 +81,62 @@ La respuesta del bot no cambia segun el canal. Cuando aparezca Instagram o un
 widget web, se agrega una carpeta al lado en vez de meter `if channel == "whatsapp"`
 en medio del servicio de conversacion.
 
+## Autenticacion
+
+No hay un solo consumidor de la API, hay tres con niveles de confianza distintos.
+Conflacionarlos es el error de diseno a evitar.
+
+| Scope | Quien | Puede | Donde vive la clave |
+| --- | --- | --- | --- |
+| `admin` | la agencia | crear/listar clientes, emitir y revocar claves | tu servidor |
+| `tenant` | dashboard de un cliente | leer y editar SU config, subir SUS documentos | tu servidor |
+| `chat` | widget web del cliente | solo `POST /chat` | **el navegador de cualquiera** |
+
+**La clave `chat` es publica por naturaleza**: viaja en el JavaScript de la web
+del cliente. Si compartiera credencial con el dashboard, cualquiera que abra el
+inspector le podria editar el prompt y leer los documentos. Por eso tiene su
+propio scope, y hay tests que verifican que no puede hacer nada mas.
+
+`admin` **no** abre todas las puertas: una clave admin no tiene `tenant_id`, asi
+que no puede usar los endpoints que operan sobre un cliente concreto (`/me`).
+Es deliberado — obliga a decir explicitamente sobre que cliente se opera.
+
+### Como se guardan
+
+De la clave solo se persiste `sha256(clave)` mas un prefijo publico. El secreto
+se muestra una unica vez, al emitirla.
+
+**SHA-256 y no bcrypt/argon2, a proposito.** Esos algoritmos son lentos aposta
+para frenar la fuerza bruta contra contrasenas humanas, que tienen poca entropia.
+Una API key nuestra son 32 bytes de `secrets.token_urlsafe`: ~256 bits. No hay
+fuerza bruta posible, asi que bcrypt no compraria seguridad — solo agregaria
+~100 ms a cada request autenticado.
+
+El prefijo (16 chars) permite encontrar la fila por indice en lugar de hashear
+toda la tabla en cada request, y sirve para identificar la clave en el dashboard
+sin revelarla. La comparacion del hash es en tiempo constante.
+
+### Invariante en la base
+
+Un `CHECK` garantiza que una clave `admin` no tenga `tenant_id` y que una clave
+de cliente si lo tenga. Esta en la base y no solo en el codigo: se cumple aunque
+alguien inserte con `psql`.
+
+### Primera clave
+
+Huevo y gallina: para emitir claves hace falta una clave admin. La primera sale
+del CLI, que habla directo con la base:
+
+```bash
+uv run python -m app.cli crear-clave-admin --nombre "laptop de fermin"
+```
+
+> **Pendiente:** no hay login humano (email + contrasena) para que el duenio de
+> la pyme entre solo al dashboard. Hoy el modelo asume que la agencia opera el
+> dashboard y le emite claves al cliente. Cuando haga falta self-service, se
+> agrega una tabla `users` y sesiones **encima** de esto; las API keys siguen
+> siendo la via para el widget y las integraciones.
+
 ## Garantias del webhook
 
 Meta reintenta las entregas y espera un 200 rapido. De ahi salen dos requisitos
