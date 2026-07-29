@@ -36,10 +36,34 @@ docker compose -f infra/docker-compose.yml up -d
 **2. Backend**
 
 ```bash
-cd apps/api && cp .env.example .env && uv sync && uv run fastapi dev app/main.py
+cd apps/api && cp .env.example .env && uv sync && uv run alembic upgrade head && uv run fastapi dev app/main.py
 ```
 
 Queda en http://localhost:8000 — documentacion interactiva en `/docs`.
+
+## Migraciones (Alembic)
+
+La base **nunca** se toca a mano. Todo cambio de esquema pasa por una migracion
+versionada y commiteada.
+
+```bash
+cd apps/api
+uv run alembic upgrade head                              # aplicar pendientes
+uv run alembic revision --autogenerate -m "descripcion"  # generar tras cambiar models/
+uv run alembic downgrade -1                              # revertir la ultima
+uv run alembic current                                   # en que revision esta la base
+uv run alembic history --verbose                         # historial
+```
+
+La URL de conexion la inyecta `alembic/env.py` desde `app.core.config.settings`;
+no esta hardcodeada en `alembic.ini`.
+
+> **Revisar siempre lo que genera `--autogenerate`.** No es infalible: no detecta
+> renombres (los ve como drop + create, lo que borra datos) ni algunos cambios de
+> indice. `alembic/env.py` incluye un hook `render_item` para que emita bien el
+> tipo `Vector` de pgvector, pero el indice HNSW de `chunks.embedding` hay que
+> verificarlo a mano en cada revision que lo toque: sin ese indice la busqueda
+> vectorial hace scan secuencial de toda la tabla, sin avisar.
 
 **3. Frontend**
 

@@ -24,6 +24,9 @@ dev = [
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+# Las revisiones las escribe --autogenerate. Formatearlas a mano genera ruido en
+# los diffs y no aporta nada. alembic/env.py SI se lintea (ese lo escribimos nosotros).
+extend-exclude = ["alembic/versions"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
