@@ -148,16 +148,29 @@ async def preparar_tenant(db: AsyncSession) -> Tenant:
     return tenant
 
 
+# Segundos entre llamadas de embedding sucesivas. Una cuenta de Voyage nueva
+# devolvio 429 en la 3ra llamada seguida (con apenas 0.3-0.6s de espera entre
+# los reintentos de with_retry) - el limite es de solicitudes por segundo o por
+# minuto, no algo que un backoff corto pueda esquivar. Espaciar las llamadas de
+# entrada evita pegarle al limite, en vez de reintentar despues de pegarle.
+PACING_EMBEDDINGS_S = 2.0
+
+
 async def precomputar_chunks(db: AsyncSession, tenant: Tenant) -> dict[str, list[str]]:
     """Recupera el contexto de cada caso UNA vez, no una vez por modelo.
 
     La recuperacion no depende de que modelo va a responder despues: son los
     mismos embeddings, la misma tabla, la misma consulta. Llamar a `search()`
     (que pega contra Voyage) por cada combinacion de caso x modelo triplica las
-    llamadas sin necesidad -y es exactamente lo que dispara el rate limit de
-    una cuenta nueva: 90 llamadas seguidas en vez de 30.
+    llamadas sin necesidad -y es lo que disparaba el rate limit en el primer
+    intento: 90 llamadas seguidas en vez de 30.
     """
-    return {caso.id: await search(db, tenant.id, caso.pregunta) for caso in CASOS}
+    resultado: dict[str, list[str]] = {}
+    for i, caso in enumerate(CASOS):
+        if i > 0:
+            await asyncio.sleep(PACING_EMBEDDINGS_S)
+        resultado[caso.id] = await search(db, tenant.id, caso.pregunta)
+    return resultado
 
 
 async def correr_caso(
