@@ -22,6 +22,10 @@ secrets/
 *_dsa
 *_ed25519
 
+# Reportes de evals/: son corridas de prueba con costo real, no artefactos del
+# repo. El directorio se versiona (via reports/.gitkeep); su contenido no.
+apps/api/evals/reports/*.md
+
 # ═══════════════ Python / FastAPI ═══════════════
 .venv/
 venv/
