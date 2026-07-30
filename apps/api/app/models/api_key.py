@@ -31,7 +31,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.session import Base
 
 
-class Scope(str, enum.Enum):
+class Scope(enum.StrEnum):
     ADMIN = "admin"
     TENANT = "tenant"
     CHAT = "chat"

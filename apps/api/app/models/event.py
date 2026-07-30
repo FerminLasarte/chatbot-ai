@@ -25,7 +25,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.db.session import Base
 
 
-class EventStatus(str, enum.Enum):
+class EventStatus(enum.StrEnum):
     PENDING = "pending"
     DONE = "done"
     FAILED = "failed"

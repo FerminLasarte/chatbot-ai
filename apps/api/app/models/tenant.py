@@ -110,9 +110,7 @@ class Conversation(Base):
 
     messages: Mapped[list["Message"]] = relationship(back_populates="conversation")
 
-    __table_args__ = (
-        Index("ix_conversations_lookup", "tenant_id", "channel", "external_id"),
-    )
+    __table_args__ = (Index("ix_conversations_lookup", "tenant_id", "channel", "external_id"),)
 
 
 class Message(Base):
