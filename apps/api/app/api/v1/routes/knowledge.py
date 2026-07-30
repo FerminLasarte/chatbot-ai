@@ -2,9 +2,10 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, File, UploadFile, status
+from fastapi import APIRouter, File, HTTPException, UploadFile, status
 from sqlalchemy import func, select
 
+from app.ai.rag.extract import ExtraccionFallida, extract_text
 from app.ai.rag.ingest import ingest_document
 from app.api.v1.deps import CurrentTenant, DbSession, TenantKey
 from app.models.tenant import Chunk, Document
@@ -20,15 +21,19 @@ async def upload_document(
     file: Annotated[UploadFile, File()],
     _: TenantKey,
 ) -> DocumentRead:
-    """Sube un .txt/.md y lo indexa.
+    """Sube un .txt/.md/.pdf y lo indexa.
 
-    TODO: PDF y DOCX. Mover a `workers/` cuando los archivos pasen de unos pocos MB:
+    TODO: DOCX. Mover a `workers/` cuando los archivos pasen de unos pocos MB:
     embeber en el request bloquea el worker de uvicorn.
     """
     raw = await file.read()
-    text = raw.decode("utf-8", errors="replace")
+    filename = file.filename or "sin-titulo"
+    try:
+        text = extract_text(filename, raw)
+    except ExtraccionFallida as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
 
-    document = await ingest_document(db, tenant.id, title=file.filename or "sin-titulo", text=text)
+    document = await ingest_document(db, tenant.id, title=filename, text=text)
     count = await db.scalar(
         select(func.count()).select_from(Chunk).where(Chunk.document_id == document.id)
     )
