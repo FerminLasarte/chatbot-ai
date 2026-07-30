@@ -148,10 +148,25 @@ async def preparar_tenant(db: AsyncSession) -> Tenant:
     return tenant
 
 
+async def precomputar_chunks(db: AsyncSession, tenant: Tenant) -> dict[str, list[str]]:
+    """Recupera el contexto de cada caso UNA vez, no una vez por modelo.
+
+    La recuperacion no depende de que modelo va a responder despues: son los
+    mismos embeddings, la misma tabla, la misma consulta. Llamar a `search()`
+    (que pega contra Voyage) por cada combinacion de caso x modelo triplica las
+    llamadas sin necesidad -y es exactamente lo que dispara el rate limit de
+    una cuenta nueva: 90 llamadas seguidas en vez de 30.
+    """
+    return {caso.id: await search(db, tenant.id, caso.pregunta) for caso in CASOS}
+
+
 async def correr_caso(
-    db: AsyncSession, tenant: Tenant, modelo: str, caso: Caso, historia: list[MessageParam]
+    tenant: Tenant,
+    modelo: str,
+    caso: Caso,
+    chunks: list[str],
+    historia: list[MessageParam],
 ) -> Resultado:
-    chunks = await search(db, tenant.id, caso.pregunta)
     system_blocks = build_system_blocks(tenant.system_prompt)
 
     mensajes: list[MessageParam] = [*historia]
@@ -193,12 +208,14 @@ async def correr_caso(
     )
 
 
-async def correr_modelo(db: AsyncSession, tenant: Tenant, modelo: str) -> list[Resultado]:
+async def correr_modelo(
+    tenant: Tenant, modelo: str, chunks_por_caso: dict[str, list[str]]
+) -> list[Resultado]:
     historias: dict[str, list[MessageParam]] = {}
     resultados: list[Resultado] = []
     for caso in CASOS:
         historia = historias.setdefault(caso.hilo, [])
-        r = await correr_caso(db, tenant, modelo, caso, historia)
+        r = await correr_caso(tenant, modelo, caso, chunks_por_caso[caso.id], historia)
         resultados.append(r)
         marca = "OK" if r.check else ("FALLO" if r.check is False else "manual")
         typer.echo(f"  [{modelo}] {caso.id} ... {marca} ({r.latencia_s:.1f}s, ${r.costo_usd:.4f})")
@@ -272,11 +289,15 @@ async def _correr(modelos: list[str], out: str | None) -> None:
         try:
             tenant = await preparar_tenant(db)
             tenant_id = tenant.id
-            typer.echo(f"Tenant de prueba: {tenant.slug}\n")
+            typer.echo(f"Tenant de prueba: {tenant.slug}")
+
+            typer.echo("Recuperando contexto (una vez, se reusa entre modelos)...")
+            chunks_por_caso = await precomputar_chunks(db, tenant)
+            typer.echo("")
 
             for modelo in modelos:
                 typer.echo(f"=== {modelo} ===")
-                resultados += await correr_modelo(db, tenant, modelo)
+                resultados += await correr_modelo(tenant, modelo, chunks_por_caso)
                 typer.echo("")
         finally:
             settings.llm_model = modelo_original
