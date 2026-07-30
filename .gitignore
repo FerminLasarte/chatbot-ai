@@ -79,10 +79,15 @@ faiss_index/
 vector_store/
 embeddings_cache/
 .cache/huggingface/
-models/
 *.gguf
 *.safetensors
 *.bin
+# NO agregar un `models/` generico aca: sin barra inicial matchea CUALQUIER
+# carpeta llamada "models" en cualquier profundidad, incluida apps/api/app/models/
+# (los modelos de SQLAlchemy). Ese bug se comio el paquete completo de modelos
+# sin que nadie lo notara hasta que CI empezo a fallar en todos los commits.
+# Los patrones de arriba (extension y nombres de cache especificos) ya cubren
+# los artefactos de modelos de ML descargados sin ese riesgo.
 
 # Documentos de clientes subidos a la base de conocimiento (datos de terceros)
 uploads/
