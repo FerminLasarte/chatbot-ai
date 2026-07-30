@@ -43,7 +43,14 @@ class Tenant(Base):
     monthly_message_limit: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
-    documents: Mapped[list["Document"]] = relationship(back_populates="tenant")
+    # passive_deletes=True: al borrar un tenant, que la CASCADE de Postgres
+    # borre los documentos (declarada en el ForeignKey de abajo), no el ORM.
+    # Sin esto, SQLAlchemy intenta poner tenant_id=NULL en los documentos antes
+    # de borrar el tenant -por si algun dia el objeto se "desasocia" en vez de
+    # borrarse- y esa columna no admite NULL: revienta con NotNullViolation.
+    documents: Mapped[list["Document"]] = relationship(
+        back_populates="tenant", passive_deletes=True
+    )
 
 
 class Document(Base):
@@ -58,7 +65,9 @@ class Document(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     tenant: Mapped[Tenant] = relationship(back_populates="documents")
-    chunks: Mapped[list["Chunk"]] = relationship(back_populates="document")
+    # Mismo motivo que Tenant.documents: dejar que la CASCADE de Postgres borre
+    # los chunks, no que el ORM intente vaciar chunks.document_id.
+    chunks: Mapped[list["Chunk"]] = relationship(back_populates="document", passive_deletes=True)
 
 
 class Chunk(Base):
@@ -108,7 +117,10 @@ class Conversation(Base):
         DateTime(timezone=True), server_default=func.now(), index=True
     )
 
-    messages: Mapped[list["Message"]] = relationship(back_populates="conversation")
+    # Mismo motivo que Tenant.documents.
+    messages: Mapped[list["Message"]] = relationship(
+        back_populates="conversation", passive_deletes=True
+    )
 
     __table_args__ = (Index("ix_conversations_lookup", "tenant_id", "channel", "external_id"),)
 
