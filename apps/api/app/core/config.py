@@ -28,7 +28,13 @@ class Settings(BaseSettings):
     # --- Embeddings (Anthropic NO tiene endpoint de embeddings) ---
     embeddings_provider: str = "voyage"
     voyage_api_key: str = ""
-    embeddings_model: str = "voyage-3"
+    # voyage-4: uso general, 1024 dims (verificado con una llamada real). NO
+    # usar voyage-code-*/voyage-law-*/voyage-finance-*/voyage-multimodal-*:
+    # son modelos especializados para ese dominio, no para texto de negocio
+    # generico. Si cambias de modelo, verifica embeddings_dim con una llamada
+    # real antes de tocar esto -distintos modelos devuelven distinta dimension,
+    # y la columna Vector(dim) de Postgres es de tamano fijo.
+    embeddings_model: str = "voyage-4"
     embeddings_dim: int = 1024
 
     # --- Memoria conversacional ---
