@@ -30,6 +30,7 @@ import asyncio
 import re
 import time
 import uuid
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -144,7 +145,10 @@ async def preparar_tenant(db: AsyncSession) -> Tenant:
     await db.refresh(tenant)
 
     texto_fixture = FIXTURE.read_text(encoding="utf-8")
-    await ingest_document(db, tenant.id, title="Info del negocio", text=texto_fixture)
+    await _con_paciencia(
+        "ingesta del fixture",
+        lambda: ingest_document(db, tenant.id, title="Info del negocio", text=texto_fixture),
+    )
 
     return tenant
 
@@ -182,23 +186,27 @@ async def precomputar_chunks(db: AsyncSession, tenant: Tenant) -> dict[str, list
     return resultado
 
 
-async def _buscar_con_paciencia(db: AsyncSession, tenant: Tenant, caso: Caso) -> list[str]:
-    """search() con reintento largo si el rate limit se activa igual.
+async def _con_paciencia[T](descripcion: str, fn: Callable[[], Awaitable[T]]) -> T:
+    """Reintenta `fn` con backoff largo si el rate limit se activa igual.
 
     embedder.py ya reintenta internamente (rapido, pensado para un usuario en
     vivo). Si esos 3 intentos rapidos se agotan igual, aca se espera en serio
-    (10s, 30s, 60s) y se reintenta el caso puntual -no toda la corrida-.
+    (10s, 30s, 60s) y se reintenta -no se tira abajo toda la corrida-.
     """
     for i, espera in enumerate([0, *PACIENCIA_EXTRA_S]):
         if espera:
-            typer.echo(f"  rate limit en {caso.id}, esperando {espera}s antes de reintentar...")
+            typer.echo(f"  rate limit en {descripcion}, esperando {espera}s antes de reintentar...")
             await asyncio.sleep(espera)
         try:
-            return await search(db, tenant.id, caso.pregunta)
+            return await fn()
         except RetryableHTTPError:
             if i == len(PACIENCIA_EXTRA_S):
                 raise
     raise AssertionError("inalcanzable")
+
+
+async def _buscar_con_paciencia(db: AsyncSession, tenant: Tenant, caso: Caso) -> list[str]:
+    return await _con_paciencia(caso.id, lambda: search(db, tenant.id, caso.pregunta))
 
 
 async def correr_caso(
