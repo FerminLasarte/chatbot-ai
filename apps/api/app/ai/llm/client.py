@@ -13,7 +13,7 @@ Notas de la API vigente:
 import logging
 from dataclasses import dataclass
 
-from anthropic import AsyncAnthropic
+from anthropic import AsyncAnthropic, omit
 from anthropic.types import MessageParam, OutputConfigParam, TextBlockParam
 
 from app.core.config import settings
@@ -24,6 +24,11 @@ _client = AsyncAnthropic(api_key=settings.anthropic_api_key or None)
 
 
 RECHAZO = "Perdon, no puedo ayudarte con eso. Si queres te derivo con alguien del equipo."
+
+# `effort` solo lo soporta la familia Claude 5 (opus-5, sonnet-5). Haiku 4.5 no
+# es parte de esa familia y devuelve 400 "This model does not support the
+# effort parameter" (confirmado con una llamada real).
+_MODELOS_CON_EFFORT = ("claude-opus-5", "claude-sonnet-5")
 
 
 @dataclass(frozen=True)
@@ -42,13 +47,18 @@ async def complete(
     max_tokens: int | None = None,
 ) -> Respuesta:
     """Una respuesta de texto. Streaming para no chocar con timeouts HTTP."""
-    output_config = OutputConfigParam(effort=settings.llm_effort)  # type: ignore[typeddict-item]
+    output_config: OutputConfigParam | None = (
+        OutputConfigParam(effort=settings.llm_effort)  # type: ignore[typeddict-item]
+        if settings.llm_model.startswith(_MODELOS_CON_EFFORT)
+        else None
+    )
+
     async with _client.messages.stream(
         model=settings.llm_model,
         max_tokens=max_tokens or settings.llm_max_tokens,
         system=system_blocks,
         messages=messages,
-        output_config=output_config,
+        output_config=output_config if output_config is not None else omit,
     ) as stream:
         response = await stream.get_final_message()
 
