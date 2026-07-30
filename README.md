@@ -8,7 +8,7 @@ tiene su propio System Prompt y su propia base de conocimiento.
 | Capa      | Tecnologia                                         |
 | --------- | -------------------------------------------------- |
 | Backend   | Python 3.12 + FastAPI + SQLAlchemy 2.0 (async)      |
-| LLM       | Anthropic Claude (`claude-opus-5`)                  |
+| LLM       | Anthropic Claude (`claude-haiku-4-5`, ver `evals/`) |
 | RAG       | Postgres + pgvector, embeddings de Voyage AI        |
 | Frontend  | Next.js 16 (App Router) + TypeScript + Tailwind     |
 | Canales   | WhatsApp Cloud API (Meta), widget web               |

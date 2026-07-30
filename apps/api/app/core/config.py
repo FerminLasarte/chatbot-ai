@@ -19,10 +19,14 @@ class Settings(BaseSettings):
 
     # --- LLM (Anthropic) ---
     anthropic_api_key: str = ""
-    llm_model: str = "claude-opus-5"
+    # claude-haiku-4-5: elegido con evidencia del harness en evals/ (30 casos x
+    # 3 modelos). Mismo resultado en los checks automaticos (correccion,
+    # resistencia a alucinacion e inyeccion de prompt) que opus-5/sonnet-5, a
+    # ~15x/~5x menos costo y menor latencia. No soporta `effort` (ver mas abajo).
+    llm_model: str = "claude-haiku-4-5"
     llm_max_tokens: int = 4096
-    # low | medium | high | xhigh | max. Para respuestas de chat cortas y
-    # sensibles a latencia, "low" o "medium" rinden muy bien en Opus 5.
+    # low | medium | high | xhigh | max. Solo aplica a la familia Claude 5
+    # (opus-5, sonnet-5) -ver app/ai/llm/client.py-, no a Haiku 4.5.
     llm_effort: str = "medium"
 
     # --- Embeddings (Anthropic NO tiene endpoint de embeddings) ---

@@ -11,6 +11,7 @@ Notas de la API vigente:
 """
 
 import logging
+import re
 from dataclasses import dataclass
 
 from anthropic import AsyncAnthropic, omit
@@ -24,6 +25,17 @@ _client = AsyncAnthropic(api_key=settings.anthropic_api_key or None)
 
 
 RECHAZO = "Perdon, no puedo ayudarte con eso. Si queres te derivo con alguien del equipo."
+
+# El prompt le pide al modelo que no use markdown, pero no todos lo respetan
+# siempre (confirmado: haiku-4-5 a veces igual manda **negrita**). WhatsApp no
+# renderiza doble asterisco, lo muestra literal -asi que se limpia aca, en el
+# unico punto de salida, en vez de confiar en que el modelo obedezca siempre.
+_MARKDOWN_NEGRITA = re.compile(r"\*\*(.+?)\*\*")
+
+
+def _limpiar_markdown(texto: str) -> str:
+    return _MARKDOWN_NEGRITA.sub(r"\1", texto)
+
 
 # `effort` solo lo soporta la familia Claude 5 (opus-5, sonnet-5). Haiku 4.5 no
 # es parte de esa familia y devuelve 400 "This model does not support the
@@ -81,7 +93,5 @@ async def complete(
         extra={**consumo, "cache_write": usage.cache_creation_input_tokens},
     )
 
-    return Respuesta(
-        text="".join(b.text for b in response.content if b.type == "text").strip(),
-        **consumo,
-    )
+    texto = "".join(b.text for b in response.content if b.type == "text").strip()
+    return Respuesta(text=_limpiar_markdown(texto), **consumo)
