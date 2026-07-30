@@ -44,6 +44,7 @@ from app.ai.prompts.builder import build_system_blocks, build_user_turn
 from app.ai.rag.ingest import ingest_document
 from app.ai.rag.retriever import search
 from app.core.config import settings
+from app.core.retry import RetryableHTTPError
 from app.db.session import SessionLocal
 from app.models.tenant import Tenant
 from evals.cases import CASOS, Caso
@@ -148,12 +149,20 @@ async def preparar_tenant(db: AsyncSession) -> Tenant:
     return tenant
 
 
-# Segundos entre llamadas de embedding sucesivas. Una cuenta de Voyage nueva
-# devolvio 429 en la 3ra llamada seguida (con apenas 0.3-0.6s de espera entre
-# los reintentos de with_retry) - el limite es de solicitudes por segundo o por
-# minuto, no algo que un backoff corto pueda esquivar. Espaciar las llamadas de
-# entrada evita pegarle al limite, en vez de reintentar despues de pegarle.
-PACING_EMBEDDINGS_S = 2.0
+# Segundos entre llamadas de embedding sucesivas. Espaciar el envio evita
+# pegarle al rate limit en primer lugar; ver PACIENCIA_EXTRA_S mas abajo para
+# el caso en que igual se pega.
+PACING_EMBEDDINGS_S = 3.0
+
+# El cliente de embedder.py (embedder.py -> core/retry.py) reintenta 3 veces
+# con backoff corto (menos de 2s en total): esta bien para el producto real,
+# donde hay un usuario esperando la respuesta y no tiene sentido hacerlo
+# esperar mucho. Un eval es un trabajo por lotes sin nadie esperando en vivo,
+# asi que ademas de espaciar el envio, si el rate limit igual se activa (por
+# ejemplo, arrastrado de una corrida anterior que fallo hace poco), vale la
+# pena esperar mucho mas y reintentar el CASO puntual en vez de tirar abajo
+# toda la corrida de 30 preguntas x 3 modelos.
+PACIENCIA_EXTRA_S = [10, 30, 60]
 
 
 async def precomputar_chunks(db: AsyncSession, tenant: Tenant) -> dict[str, list[str]]:
@@ -169,8 +178,27 @@ async def precomputar_chunks(db: AsyncSession, tenant: Tenant) -> dict[str, list
     for i, caso in enumerate(CASOS):
         if i > 0:
             await asyncio.sleep(PACING_EMBEDDINGS_S)
-        resultado[caso.id] = await search(db, tenant.id, caso.pregunta)
+        resultado[caso.id] = await _buscar_con_paciencia(db, tenant, caso)
     return resultado
+
+
+async def _buscar_con_paciencia(db: AsyncSession, tenant: Tenant, caso: Caso) -> list[str]:
+    """search() con reintento largo si el rate limit se activa igual.
+
+    embedder.py ya reintenta internamente (rapido, pensado para un usuario en
+    vivo). Si esos 3 intentos rapidos se agotan igual, aca se espera en serio
+    (10s, 30s, 60s) y se reintenta el caso puntual -no toda la corrida-.
+    """
+    for i, espera in enumerate([0, *PACIENCIA_EXTRA_S]):
+        if espera:
+            typer.echo(f"  rate limit en {caso.id}, esperando {espera}s antes de reintentar...")
+            await asyncio.sleep(espera)
+        try:
+            return await search(db, tenant.id, caso.pregunta)
+        except RetryableHTTPError:
+            if i == len(PACIENCIA_EXTRA_S):
+                raise
+    raise AssertionError("inalcanzable")
 
 
 async def correr_caso(
