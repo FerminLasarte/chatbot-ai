@@ -53,7 +53,19 @@ class VoyageEmbedder:
                 data = resp.json()["data"]
             return [item["embedding"] for item in sorted(data, key=lambda d: d["index"])]
 
-        return await with_retry(_call, descripcion="embeddings de Voyage")
+        # Mas paciente que el default: el rate limit de Voyage se mide por
+        # ventana de minuto, asi que los ~1.5s del backoff por defecto caen
+        # siempre dentro de la misma ventana y no sirven de nada. Con estos
+        # valores las esperas son ~3s, ~6s y ~12s (~21s en total): suficiente
+        # para cruzar a la ventana siguiente sin dejar colgado al usuario
+        # indefinidamente.
+        return await with_retry(
+            _call,
+            intentos=4,
+            base_delay=3.0,
+            max_delay=12.0,
+            descripcion="embeddings de Voyage",
+        )
 
 
 def get_embedder() -> Embedder:

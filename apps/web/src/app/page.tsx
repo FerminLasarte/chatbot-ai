@@ -5,6 +5,18 @@ import { FormEvent, useRef, useState } from "react";
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 const API_KEY = process.env.NEXT_PUBLIC_API_KEY ?? "";
 
+// El backend responde JSON, pero un 500 sin manejar de FastAPI viene en texto
+// plano: hacer res.json() a ciegas rompe ahi y el error real queda tapado por
+// un "no se pudo conectar" que miente sobre lo que paso.
+async function leerError(res: Response): Promise<string> {
+  try {
+    const data = await res.json();
+    return data.detail ?? `error ${res.status}`;
+  } catch {
+    return `error ${res.status} del servidor`;
+  }
+}
+
 type Mensaje = { rol: "user" | "assistant"; texto: string };
 
 type EstadoDocumento =
@@ -33,11 +45,11 @@ export default function Home() {
         headers: { Authorization: `Bearer ${API_KEY}` },
         body: form,
       });
-      const data = await res.json();
       if (!res.ok) {
-        setDocumento({ tipo: "error", mensaje: data.detail ?? "no se pudo subir el archivo" });
+        setDocumento({ tipo: "error", mensaje: await leerError(res) });
         return;
       }
+      const data = await res.json();
       setDocumento({ tipo: "listo", nombre: data.title, chunks: data.chunks });
       setMensajes([]);
       conversationId.current = null;
@@ -67,11 +79,12 @@ export default function Home() {
           conversation_id: conversationId.current,
         }),
       });
-      const data = await res.json();
       if (!res.ok) {
-        setMensajes((m) => [...m, { rol: "assistant", texto: `Error: ${data.detail}` }]);
+        const error = await leerError(res);
+        setMensajes((m) => [...m, { rol: "assistant", texto: error }]);
         return;
       }
+      const data = await res.json();
       conversationId.current = data.conversation_id;
       setMensajes((m) => [...m, { rol: "assistant", texto: data.reply }]);
     } catch {

@@ -1,5 +1,6 @@
 """Punto de entrada. Solo montaje: nada de logica de negocio aca."""
 
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -10,8 +11,11 @@ from fastapi.responses import JSONResponse
 from app.api.v1.routes import chat, knowledge, tenants, webhooks
 from app.core.config import settings
 from app.core.logging import setup_logging
+from app.core.retry import RetryableHTTPError
 from app.services.conversation import ConversacionAjena
 from app.services.quota import QuotaExcedida
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
@@ -58,6 +62,21 @@ async def _conversacion_ajena(request: Request, exc: ConversacionAjena) -> JSONR
     return JSONResponse(
         status_code=status.HTTP_404_NOT_FOUND,
         content={"detail": "conversacion no encontrada"},
+    )
+
+
+@app.exception_handler(RetryableHTTPError)
+async def _proveedor_no_disponible(request: Request, exc: RetryableHTTPError) -> JSONResponse:
+    """503 y no 500: el fallo es de un proveedor externo (rate limit o caida),
+    no un bug nuestro, y reintentar mas tarde puede funcionar.
+
+    Sin esto la excepcion sube sin manejar: FastAPI responde 500 con cuerpo de
+    texto plano, y cualquier cliente que espere JSON rompe al parsearlo.
+    """
+    logger.warning("proveedor externo no disponible: %s", exc)
+    return JSONResponse(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        content={"detail": "el servicio esta sobrecargado en este momento, probá de nuevo"},
     )
 
 
