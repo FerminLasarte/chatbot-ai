@@ -1,6 +1,7 @@
 """Comandos de administracion.
 
     uv run python -m app.cli crear-clave-admin --nombre "laptop de fermin"
+    uv run python -m app.cli crear-tenant-demo --nombre "Cliente Potencial"
     uv run python -m app.cli revocar-clave --prefijo cba_test_abc123
     uv run python -m app.cli listar-claves
 
@@ -12,6 +13,7 @@ directo con la base, asi que solo lo puede correr quien ya tiene acceso a ella.
 import asyncio
 import logging
 from datetime import UTC, datetime
+from pathlib import Path
 
 import typer
 from sqlalchemy import select
@@ -19,6 +21,7 @@ from sqlalchemy import select
 from app.core.security import generate_api_key
 from app.db.session import SessionLocal, engine
 from app.models.api_key import ApiKey, Scope
+from app.models.tenant import Document, Tenant
 
 app = typer.Typer(help="Administracion de chatbot-ai", no_args_is_help=True)
 
@@ -67,6 +70,69 @@ def crear_clave_admin(nombre: str = typer.Option(..., "--nombre", "-n")) -> None
     typer.echo(
         f'    curl -H "Authorization: Bearer {raw[:16]}..." http://localhost:8000/api/v1/tenants'
     )
+    typer.echo("")
+
+
+@app.command("crear-tenant-demo")
+def crear_tenant_demo(
+    nombre: str = typer.Option("Demo", "--nombre", "-n"),
+    slug: str = typer.Option("demo", "--slug", "-s"),
+) -> None:
+    """Crea (o reutiliza) un tenant de demo y le escribe una clave nueva al
+    frontend, listo para levantar `apps/web` y probar sin tocar curl.
+
+    Reintentable: si el tenant ya existe le borra los documentos previos (para
+    que la demo arranque con la base de conocimiento vacia) y le emite una
+    clave nueva.
+    """
+
+    async def _run() -> tuple[str, str]:
+        async with SessionLocal() as db:
+            tenant = await db.scalar(select(Tenant).where(Tenant.slug == slug))
+            if tenant is None:
+                tenant = Tenant(
+                    slug=slug,
+                    name=nombre,
+                    system_prompt=(
+                        "Sos un asistente que responde preguntas sobre el documento que "
+                        "te suban. Se breve y concreto."
+                    ),
+                )
+                db.add(tenant)
+                await db.commit()
+                await db.refresh(tenant)
+            else:
+                previos = list(
+                    await db.scalars(select(Document).where(Document.tenant_id == tenant.id))
+                )
+                for doc in previos:
+                    await db.delete(doc)  # cascade borra los chunks (passive_deletes)
+                if previos:
+                    await db.commit()
+
+            raw, prefix, hashed = generate_api_key()
+            db.add(
+                ApiKey(
+                    name="frontend-demo",
+                    key_prefix=prefix,
+                    key_hash=hashed,
+                    tenant_id=tenant.id,
+                    scopes=[Scope.TENANT.value],
+                )
+            )
+            await db.commit()
+            return raw, str(tenant.id)
+
+    raw, tenant_id = asyncio.run(_run())
+
+    web_env = Path(__file__).resolve().parents[2] / "web" / ".env.local"
+    web_env.write_text(f"NEXT_PUBLIC_API_URL=http://localhost:8000\nNEXT_PUBLIC_API_KEY={raw}\n")
+
+    typer.echo("")
+    typer.secho(f"  Tenant '{slug}' listo ({tenant_id}).", fg=typer.colors.GREEN, bold=True)
+    typer.echo(f"  Clave escrita en {web_env}")
+    typer.echo("")
+    typer.echo("  Ahora: cd apps/web && npm install && npm run dev")
     typer.echo("")
 
 
