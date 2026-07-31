@@ -8,6 +8,8 @@ Si cambias de proveedor tambien cambia `settings.embeddings_dim` y hay que
 regenerar todos los vectores: la columna Vector(dim) es de tamano fijo.
 """
 
+import logging
+from collections import OrderedDict
 from typing import Protocol
 
 import httpx
@@ -15,7 +17,23 @@ import httpx
 from app.core.config import settings
 from app.core.retry import with_retry
 
+logger = logging.getLogger(__name__)
+
 VOYAGE_URL = "https://api.voyageai.com/v1/embeddings"
+
+# Cache de embeddings de CONSULTAS. El vector de un texto es determinista, asi
+# que repreguntar lo mismo no necesita otra llamada al proveedor -y el recurso
+# escaso son los requests por minuto, no los tokens.
+#
+# Solo consultas: los documentos se embeben una vez al subirlos, cachearlos no
+# ahorraria nada y ocuparia memoria de mas.
+#
+# No se cachea por tenant a proposito, y no hay filtracion posible entre
+# clientes: el vector depende UNICAMENTE del texto de la pregunta, no de la
+# base de conocimiento. El aislamiento vive en el WHERE tenant_id del
+# retriever, sobre el que este cache no tiene ninguna influencia.
+_CACHE_CONSULTAS: OrderedDict[tuple[str, str], list[float]] = OrderedDict()
+_CACHE_MAX = 256
 
 
 class Embedder(Protocol):
@@ -35,6 +53,25 @@ class VoyageEmbedder:
         if not settings.voyage_api_key:
             raise EmbeddingsNoConfigurado("VOYAGE_API_KEY esta vacia: completala en apps/api/.env")
 
+        # El caso cacheable es el del producto: una consulta suelta. Un lote de
+        # varias no se cachea -complica el manejo de aciertos parciales para un
+        # caso que en la practica solo ocurre al ingerir documentos-.
+        if is_query and len(texts) == 1:
+            clave = (settings.embeddings_model, texts[0])
+            if (cacheado := _CACHE_CONSULTAS.get(clave)) is not None:
+                _CACHE_CONSULTAS.move_to_end(clave)  # LRU: renovar el mas usado
+                logger.info("embedding servido del cache, sin llamar al proveedor")
+                return [cacheado]
+
+            [vector] = await self._pedir(texts, is_query=True)
+            _CACHE_CONSULTAS[clave] = vector
+            if len(_CACHE_CONSULTAS) > _CACHE_MAX:
+                _CACHE_CONSULTAS.popitem(last=False)  # descarta el menos usado
+            return [vector]
+
+        return await self._pedir(texts, is_query=is_query)
+
+    async def _pedir(self, texts: list[str], *, is_query: bool) -> list[list[float]]:
         payload = {
             "input": texts,
             "model": settings.embeddings_model,
