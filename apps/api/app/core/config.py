@@ -2,8 +2,12 @@
 
 from functools import lru_cache
 
-from pydantic import Field
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Valor con el que nace el .env.example. Si sobrevive hasta produccion, cualquiera
+# que lea el repo publico puede firmar tokens validos.
+JWT_SECRET_INSEGURO = "cambiame-en-produccion"
 
 
 class Settings(BaseSettings):
@@ -15,6 +19,11 @@ class Settings(BaseSettings):
     debug: bool = False
 
     # --- Base de datos (Postgres + pgvector) ---
+    # OJO con el driver: SQLAlchemy async necesita el prefijo `postgresql+psycopg`.
+    # Los hostings administrados (Railway, Render, Heroku) inyectan la URL con
+    # `postgresql://` o incluso `postgres://` a secas, que resuelven al driver
+    # sincronico y revientan al crear el engine async. El validador de abajo lo
+    # normaliza para que la URL del proveedor se pueda pegar tal cual.
     database_url: str = "postgresql+psycopg://chatbot:chatbot@localhost:5432/chatbot"
 
     # --- LLM (Anthropic) ---
@@ -67,11 +76,60 @@ class Settings(BaseSettings):
     whatsapp_api_version: str = "v21.0"
 
     # --- Seguridad del dashboard ---
-    jwt_secret: str = "cambiame-en-produccion"
+    jwt_secret: str = JWT_SECRET_INSEGURO
     jwt_algorithm: str = "HS256"
     access_token_ttl_minutes: int = 60 * 12
 
+    # Origenes autorizados del navegador. En produccion tiene que ser la URL real
+    # del frontend: con "*" cualquier sitio podria hacerle peticiones a la API
+    # desde el navegador de un usuario logueado.
     cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:3000"])
+
+    @field_validator("database_url")
+    @classmethod
+    def _normalizar_driver(cls, v: str) -> str:
+        """Acepta la URL tal cual la da el hosting y le pone el driver async.
+
+        Sin esto hay que acordarse de editar a mano una variable que el proveedor
+        inyecta solo (y que rota cuando se recrea la base): un pie de fuego que
+        solo se descubre cuando la app no arranca en produccion.
+        """
+        for prefijo in ("postgresql+psycopg://", "postgresql+asyncpg://"):
+            if v.startswith(prefijo):
+                return v
+        for prefijo in ("postgresql://", "postgres://"):
+            if v.startswith(prefijo):
+                return "postgresql+psycopg://" + v[len(prefijo) :]
+        return v
+
+    @model_validator(mode="after")
+    def _exigir_config_segura_en_produccion(self) -> "Settings":
+        """Falla al arrancar, no en la primera peticion.
+
+        Un servidor que levanta con secretos de ejemplo es peor que uno que no
+        levanta: parece que anda, y el agujero recien se nota cuando alguien lo
+        usa. Estas comprobaciones NO aplican en desarrollo ni en los tests.
+        """
+        if self.environment != "production":
+            return self
+
+        problemas: list[str] = []
+        if self.jwt_secret == JWT_SECRET_INSEGURO or not self.jwt_secret:
+            problemas.append("JWT_SECRET tiene el valor de ejemplo")
+        if self.debug:
+            problemas.append("DEBUG=true en produccion (loguea cada sentencia SQL)")
+        if "*" in self.cors_origins:
+            problemas.append("CORS_ORIGINS con '*'")
+        if any(o.startswith("http://") for o in self.cors_origins):
+            problemas.append("CORS_ORIGINS con http:// (tiene que ser https)")
+
+        if problemas:
+            raise ValueError(
+                "configuracion insegura para produccion: "
+                + "; ".join(problemas)
+                + ". Corregilas en las variables de entorno del hosting."
+            )
+        return self
 
 
 @lru_cache

@@ -1,0 +1,14 @@
+# Fuera de la imagen. Ademas de achicarla, evita filtrar secretos: un
+# .env.local copiado adentro viaja con la imagen a donde se publique.
+.env
+.env.*
+!.env.example
+!.env.local.example
+
+node_modules/
+.next/
+out/
+
+.git/
+.gitignore
+*.md

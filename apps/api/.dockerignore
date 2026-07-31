@@ -1,0 +1,21 @@
+# Todo lo que no tiene que entrar en la imagen. Ademas de achicarla, evita
+# meter secretos: un .env copiado adentro viaja con la imagen a donde sea que
+# se publique.
+.env
+.env.*
+!.env.example
+
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Los tests y el harness de evaluacion no se ejecutan en produccion.
+tests/
+evals/
+
+.git/
+.gitignore
+*.md
