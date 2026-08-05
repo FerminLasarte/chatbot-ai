@@ -33,6 +33,10 @@ class Tenant(Base):
     whatsapp_phone_number_id: Mapped[str | None] = mapped_column(
         String(64), unique=True, index=True, nullable=True
     )
+    # Access token de la Graph API, CIFRADO (ver core/cifrado.py). Es por cliente:
+    # autoriza a enviar mensajes en nombre de SU numero, asi que no puede vivir
+    # en la config global ni compartirse entre clientes.
+    whatsapp_access_token_cifrado: Mapped[str | None] = mapped_column(Text, nullable=True)
     settings_json: Mapped[dict] = mapped_column(JSONB, default=dict)
     is_active: Mapped[bool] = mapped_column(default=True)
 

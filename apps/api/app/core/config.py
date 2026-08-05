@@ -71,9 +71,19 @@ class Settings(BaseSettings):
     retrieval_top_k: int = 5
 
     # --- WhatsApp Cloud API (Meta) ---
+    # Estos dos son de la App de Meta, no del cliente: se comparten entre todos
+    # los numeros que cuelguen de ella. El access token, en cambio, es POR
+    # CLIENTE y vive cifrado en la tabla `tenants`.
     whatsapp_verify_token: str = ""
     whatsapp_app_secret: str = ""
     whatsapp_api_version: str = "v21.0"
+
+    # --- Cifrado de credenciales de terceros ---
+    # Clave Fernet para el access token de WhatsApp de cada cliente. Generar con:
+    #   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    # OJO: si se pierde o se cambia, los tokens ya guardados no se pueden
+    # descifrar y hay que volver a cargarlos.
+    encryption_key: str = ""
 
     # --- Seguridad del dashboard ---
     jwt_secret: str = JWT_SECRET_INSEGURO

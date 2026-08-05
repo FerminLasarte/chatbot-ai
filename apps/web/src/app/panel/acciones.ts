@@ -129,6 +129,41 @@ export async function borrarDocumento(_estado: Estado, form: FormData): Promise<
   return { ok: "Documento eliminado." };
 }
 
+// --- WhatsApp ---
+
+export async function guardarWhatsApp(_estado: Estado, form: FormData): Promise<Estado> {
+  await exigirSesion();
+  const id = String(form.get("id") ?? "");
+  const phone_number_id = String(form.get("phone_number_id") ?? "").trim();
+  const token = String(form.get("access_token") ?? "").trim();
+
+  // El campo del token viene vacio cuando no se quiso cambiar: se omite para
+  // que el backend conserve el que ya estaba (no lo devuelve nunca, asi que no
+  // se puede recargar en el formulario).
+  const datos: { phone_number_id?: string; access_token?: string } = { phone_number_id };
+  if (token) datos.access_token = token;
+
+  try {
+    await api.guardarWhatsApp(id, datos);
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "no se pudo guardar" };
+  }
+  revalidatePath(`/panel/${id}`);
+  return { ok: "WhatsApp actualizado." };
+}
+
+export async function borrarTokenWhatsApp(_estado: Estado, form: FormData): Promise<Estado> {
+  await exigirSesion();
+  const id = String(form.get("id") ?? "");
+  try {
+    await api.guardarWhatsApp(id, { access_token: "" });
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "no se pudo borrar" };
+  }
+  revalidatePath(`/panel/${id}`);
+  return { ok: "Token eliminado." };
+}
+
 // --- Claves ---
 
 export async function emitirClave(_estado: Estado, form: FormData): Promise<Estado> {

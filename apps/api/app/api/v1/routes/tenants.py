@@ -15,6 +15,7 @@ from sqlalchemy import func, select
 from app.ai.rag.extract import ExtraccionFallida, extract_text
 from app.ai.rag.ingest import ingest_document
 from app.api.v1.deps import AdminKey, CurrentTenant, DbSession, TenantKey
+from app.core.cifrado import CifradoNoConfigurado
 from app.core.config import settings
 from app.core.security import generate_api_key
 from app.models.api_key import ApiKey, Scope
@@ -29,8 +30,10 @@ from app.schemas.chat import (
     TenantCreate,
     TenantRead,
     UsageRead,
+    WhatsAppRead,
+    WhatsAppUpdate,
 )
-from app.services import quota
+from app.services import quota, whatsapp
 
 router = APIRouter(prefix="/tenants", tags=["tenants"])
 
@@ -209,6 +212,63 @@ async def read_usage_admin(tenant_id: uuid.UUID, db: DbSession, _: AdminKey) -> 
     if tenant is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "cliente no encontrado")
     return _to_usage(await quota.consumo_actual(db, tenant))
+
+
+@router.get("/{tenant_id}/whatsapp", response_model=WhatsAppRead)
+async def read_whatsapp(tenant_id: uuid.UUID, db: DbSession, _: AdminKey) -> WhatsAppRead:
+    tenant = await _tenant_o_404(db, tenant_id)
+    return WhatsAppRead(
+        phone_number_id=tenant.whatsapp_phone_number_id,
+        # Se informa SI hay token, nunca cual: el panel solo necesita saber si
+        # falta cargarlo.
+        tiene_token=bool(tenant.whatsapp_access_token_cifrado),
+        configurado=whatsapp.tiene_whatsapp(tenant),
+    )
+
+
+@router.patch("/{tenant_id}/whatsapp", response_model=WhatsAppRead)
+async def update_whatsapp(
+    tenant_id: uuid.UUID, payload: WhatsAppUpdate, db: DbSession, _: AdminKey
+) -> WhatsAppRead:
+    """Configura el canal de WhatsApp de un cliente.
+
+    El token se guarda cifrado (ver core/cifrado.py) y no se puede volver a
+    leer desde la API: solo se reemplaza.
+    """
+    tenant = await _tenant_o_404(db, tenant_id)
+
+    if payload.phone_number_id is not None:
+        nuevo = payload.phone_number_id.strip() or None
+        if nuevo is not None:
+            # El phone_number_id resuelve a que cliente pertenece un mensaje
+            # entrante. Si dos clientes tuvieran el mismo, los mensajes de uno
+            # se responderian con la informacion del otro.
+            ocupado = await db.scalar(
+                select(Tenant).where(
+                    Tenant.whatsapp_phone_number_id == nuevo, Tenant.id != tenant.id
+                )
+            )
+            if ocupado is not None:
+                raise HTTPException(
+                    status.HTTP_409_CONFLICT,
+                    "ese numero de WhatsApp ya esta asignado a otro cliente",
+                )
+        tenant.whatsapp_phone_number_id = nuevo
+
+    # None = no tocar el token existente. "" = borrarlo.
+    if payload.access_token is not None:
+        try:
+            whatsapp.guardar_token(tenant, payload.access_token.strip())
+        except CifradoNoConfigurado as exc:
+            raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(exc)) from exc
+
+    await db.commit()
+    await db.refresh(tenant)
+    return WhatsAppRead(
+        phone_number_id=tenant.whatsapp_phone_number_id,
+        tiene_token=bool(tenant.whatsapp_access_token_cifrado),
+        configurado=whatsapp.tiene_whatsapp(tenant),
+    )
 
 
 @router.patch("/{tenant_id}/prompt", response_model=TenantRead)

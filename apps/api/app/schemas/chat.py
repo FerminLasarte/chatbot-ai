@@ -63,6 +63,27 @@ class PromptUpdate(BaseModel):
     system_prompt: str = Field(max_length=100_000)
 
 
+class WhatsAppUpdate(BaseModel):
+    """Credenciales del canal de WhatsApp de un cliente.
+
+    El access token va en el body, nunca en la URL: como query param terminaria
+    escrito en los logs de acceso del servidor y de cualquier proxy intermedio.
+    """
+
+    phone_number_id: str | None = Field(default=None, max_length=64)
+    # None = no tocar el token guardado (para poder editar solo el numero sin
+    # tener que volver a pegar el token). Cadena vacia = borrarlo.
+    access_token: str | None = Field(default=None, max_length=1000)
+
+
+class WhatsAppRead(BaseModel):
+    """Estado del canal. NUNCA devuelve el token, ni siquiera parcial."""
+
+    phone_number_id: str | None
+    tiene_token: bool
+    configurado: bool
+
+
 class DocumentRead(BaseModel):
     id: str
     title: str

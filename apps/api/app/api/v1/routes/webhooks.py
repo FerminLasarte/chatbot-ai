@@ -26,7 +26,7 @@ from app.core.logging import tenant_id_ctx
 from app.core.security import verify_meta_signature
 from app.db.session import SessionLocal
 from app.models.tenant import Tenant
-from app.services import inbox
+from app.services import inbox, whatsapp
 from app.services.conversation import answer
 from app.services.quota import QuotaExcedida
 
@@ -114,11 +114,17 @@ async def _handle(
     ya le dijimos 200 a Meta y no va a reintentar.
     """
     tenant_id_ctx.set(str(tenant_id))
+    token: str | None = None
     try:
         async with SessionLocal() as db:
             tenant = await db.get(Tenant, tenant_id)
             if tenant is None:
                 raise RuntimeError(f"el tenant {tenant_id} desaparecio entre el claim y el handle")
+
+            # Se lee antes de generar la respuesta: si falta la credencial, no
+            # tiene sentido gastar en el LLM una respuesta que no se va a poder
+            # entregar.
+            token = whatsapp.leer_token(tenant)
 
             try:
                 # La conversacion se reanuda por el numero del usuario final,
@@ -135,18 +141,26 @@ async def _handle(
                     extra={"tenant_id": str(tenant_id)},
                 )
                 await send_text(
-                    to=to_number, text=MENSAJE_SIN_CUOTA, phone_number_id=phone_number_id
+                    to=to_number,
+                    text=MENSAJE_SIN_CUOTA,
+                    phone_number_id=phone_number_id,
+                    access_token=token or "",
                 )
                 await inbox.mark_done(db, event_id)
                 return
 
-            await send_text(to=to_number, text=reply, phone_number_id=phone_number_id)
+            await send_text(
+                to=to_number,
+                text=reply,
+                phone_number_id=phone_number_id,
+                access_token=token or "",
+            )
             await inbox.mark_done(db, event_id)
 
     except Exception as exc:  # noqa: BLE001 — frontera: aca no puede escapar nada
         logger.exception("fallo el procesamiento del mensaje", extra={"event_id": str(event_id)})
         await _registrar_fallo(event_id, exc)
-        await _avisar_al_usuario(to_number, phone_number_id)
+        await _avisar_al_usuario(to_number, phone_number_id, token)
 
 
 async def _registrar_fallo(event_id: uuid.UUID, exc: Exception) -> None:
@@ -158,9 +172,23 @@ async def _registrar_fallo(event_id: uuid.UUID, exc: Exception) -> None:
         logger.exception("tampoco se pudo registrar el fallo", extra={"event_id": str(event_id)})
 
 
-async def _avisar_al_usuario(to_number: str, phone_number_id: str) -> None:
-    """Mejor un 'tuve un problema' que un silencio indistinguible de ser ignorado."""
+async def _avisar_al_usuario(
+    to_number: str, phone_number_id: str, access_token: str | None
+) -> None:
+    """Mejor un 'tuve un problema' que un silencio indistinguible de ser ignorado.
+
+    Si el fallo fue justamente que no hay credencial, no hay forma de avisarle:
+    se registra y se sale, en vez de encadenar otro error.
+    """
+    if not access_token:
+        logger.error("sin access token: no se puede avisar al usuario del fallo")
+        return
     try:
-        await send_text(to=to_number, text=MENSAJE_DE_CORTESIA, phone_number_id=phone_number_id)
+        await send_text(
+            to=to_number,
+            text=MENSAJE_DE_CORTESIA,
+            phone_number_id=phone_number_id,
+            access_token=access_token,
+        )
     except Exception:  # noqa: BLE001
         logger.exception("no se pudo entregar ni el mensaje de cortesia")

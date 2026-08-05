@@ -16,11 +16,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.routes import webhooks
 from app.channels.whatsapp.client import WhatsAppSendError
+from app.core import cifrado as cifrado_mod
 from app.core.retry import RetryableHTTPError, with_retry
 from app.db.session import SessionLocal
 from app.models.event import EventStatus, ProcessedEvent
 from app.models.tenant import Tenant
-from app.services import inbox
+from app.services import inbox, whatsapp
+
+CLAVE_DE_PRUEBA = "6DLQaJDkYtFB3LMlBI1nCH_1kBaRhGSFTOM6vD-FJTM="
+TOKEN_DE_PRUEBA = "EAAGtoken-de-prueba"
 
 
 @pytest_asyncio.fixture
@@ -173,8 +177,12 @@ async def test_agota_reintentos_y_levanta_excepcion_propia() -> None:
 
 
 @pytest_asyncio.fixture
-async def tenant(db: AsyncSession) -> AsyncIterator[Tenant]:
+async def tenant(db: AsyncSession, monkeypatch: pytest.MonkeyPatch) -> AsyncIterator[Tenant]:
+    # Un cliente que recibe mensajes de WhatsApp tiene, por definicion, sus
+    # credenciales cargadas: sin token no habria como contestarle.
+    monkeypatch.setattr(cifrado_mod.settings, "encryption_key", CLAVE_DE_PRUEBA)
     t = Tenant(slug=f"test-wh-{uuid.uuid4().hex[:8]}", name="Cliente de prueba")
+    whatsapp.guardar_token(t, TOKEN_DE_PRUEBA)
     db.add(t)
     await db.commit()
     await db.refresh(t)
@@ -196,12 +204,16 @@ async def test_si_falla_el_llm_no_propaga_registra_y_avisa_al_usuario(
     ni reintento, ni log util, ni respuesta al usuario.
     """
     enviados: list[str] = []
+    tokens_usados: list[str] = []
 
     async def llm_caido(*args: object, **kwargs: object) -> tuple[str, uuid.UUID]:
         raise RuntimeError("Anthropic devolvio 529 overloaded")
 
-    async def capturar_envio(*, to: str, text: str, phone_number_id: str) -> None:
+    async def capturar_envio(
+        *, to: str, text: str, phone_number_id: str, access_token: str
+    ) -> None:
         enviados.append(text)
+        tokens_usados.append(access_token)
 
     monkeypatch.setattr(webhooks, "answer", llm_caido)
     monkeypatch.setattr(webhooks, "send_text", capturar_envio)
@@ -226,12 +238,16 @@ async def test_camino_feliz_marca_done_y_responde(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     enviados: list[str] = []
+    tokens_usados: list[str] = []
 
     async def llm_ok(*args: object, **kwargs: object) -> tuple[str, uuid.UUID]:
         return "Hola! Atendemos de 9 a 18.", uuid.uuid4()
 
-    async def capturar_envio(*, to: str, text: str, phone_number_id: str) -> None:
+    async def capturar_envio(
+        *, to: str, text: str, phone_number_id: str, access_token: str
+    ) -> None:
         enviados.append(text)
+        tokens_usados.append(access_token)
 
     monkeypatch.setattr(webhooks, "answer", llm_ok)
     monkeypatch.setattr(webhooks, "send_text", capturar_envio)
@@ -245,6 +261,9 @@ async def test_camino_feliz_marca_done_y_responde(
     assert evento is not None
     assert evento.status == EventStatus.DONE.value
     assert enviados == ["Hola! Atendemos de 9 a 18."]
+    # El token que se usa para enviar es el del cliente dueño del numero, no
+    # uno global: es lo que permite que cada negocio conteste desde el suyo.
+    assert tokens_usados == [TOKEN_DE_PRUEBA]
 
 
 async def test_si_falla_el_envio_no_se_marca_como_done(
@@ -260,7 +279,7 @@ async def test_si_falla_el_envio_no_se_marca_como_done(
 
     intentos: list[str] = []
 
-    async def envio_roto(*, to: str, text: str, phone_number_id: str) -> None:
+    async def envio_roto(*, to: str, text: str, phone_number_id: str, access_token: str) -> None:
         intentos.append(text)
         raise WhatsAppSendError("Meta rechazo el envio (400)")
 

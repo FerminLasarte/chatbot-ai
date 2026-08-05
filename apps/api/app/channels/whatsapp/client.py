@@ -14,15 +14,25 @@ class WhatsAppSendError(Exception):
     """No se pudo entregar el mensaje al usuario final."""
 
 
-async def send_text(to: str, text: str, phone_number_id: str) -> None:
-    """Envia un mensaje de texto.
+class WhatsAppSinCredencial(WhatsAppSendError):
+    """El cliente no tiene cargado su access token."""
+
+
+async def send_text(to: str, text: str, phone_number_id: str, access_token: str) -> None:
+    """Envia un mensaje de texto en nombre del numero indicado.
+
+    El access_token es POR CLIENTE y llega descifrado desde `tenants` (ver
+    services.whatsapp.credenciales). No sale de la config global: autoriza a
+    escribir en nombre del negocio, asi que dos clientes nunca comparten uno.
 
     Levanta excepcion si no se pudo entregar: quien llama necesita saberlo para
     no marcar el mensaje como procesado con exito.
-
-    TODO: el access token es por tenant — moverlo a la tabla `tenants` (cifrado)
-    en vez de a settings globales.
     """
+    if not access_token:
+        raise WhatsAppSinCredencial(
+            "el cliente no tiene access token de WhatsApp cargado (se configura en el panel)"
+        )
+
     url = f"https://graph.facebook.com/{settings.whatsapp_api_version}/{phone_number_id}/messages"
     payload = {
         "messaging_product": "whatsapp",
@@ -33,7 +43,12 @@ async def send_text(to: str, text: str, phone_number_id: str) -> None:
 
     async def _call() -> None:
         async with httpx.AsyncClient(timeout=20) as client:
-            resp = await client.post(url, json=payload)
+            resp = await client.post(
+                url,
+                json=payload,
+                # Sin este header Meta responde 401 y no se entrega nada.
+                headers={"Authorization": f"Bearer {access_token}"},
+            )
             resp.raise_for_status()
 
     try:

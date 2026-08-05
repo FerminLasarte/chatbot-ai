@@ -1,13 +1,15 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
-import { listarClaves, listarClientes, listarDocumentos, verUso } from "@/lib/api";
+import { listarClaves, listarClientes, listarDocumentos, verUso, verWhatsApp } from "@/lib/api";
 import { haySesion } from "@/lib/session";
 import {
   borrarDocumento,
+  borrarTokenWhatsApp,
   emitirClave,
   guardarLimite,
   guardarPrompt,
+  guardarWhatsApp,
   revocarClave,
   subirDocumento,
 } from "../acciones";
@@ -23,11 +25,12 @@ export default async function Cliente({ params }: { params: Promise<{ id: string
 
   // Se piden en paralelo: son cuatro consultas independientes y en serie
   // sumarian sus latencias.
-  const [clientes, documentos, uso, claves] = await Promise.all([
+  const [clientes, documentos, uso, claves, wa] = await Promise.all([
     listarClientes(),
     listarDocumentos(id),
     verUso(id),
     listarClaves(id),
+    verWhatsApp(id),
   ]);
 
   const cliente = clientes.find((c) => c.id === id);
@@ -108,6 +111,62 @@ export default async function Cliente({ params }: { params: Promise<{ id: string
               <Boton variante="suave">Subir documento</Boton>
             </div>
           </Formulario>
+        </Seccion>
+
+        {/* --- WhatsApp --- */}
+        <Seccion
+          titulo="WhatsApp"
+          ayuda="Conecta el numero del cliente. Sin las dos cosas cargadas, el bot no puede responder por WhatsApp."
+        >
+          <p className="mb-3 text-sm">
+            {wa.configurado ? (
+              <span className="text-green-700 dark:text-green-400">
+                Conectado — el bot responde por WhatsApp.
+              </span>
+            ) : (
+              <span className="text-amber-700 dark:text-amber-400">
+                {wa.phone_number_id && !wa.tiene_token
+                  ? "Falta el access token."
+                  : wa.tiene_token && !wa.phone_number_id
+                    ? "Falta el numero (phone number ID)."
+                    : "Sin configurar."}
+              </span>
+            )}
+          </p>
+
+          <Formulario accion={guardarWhatsApp} className="flex flex-col gap-3">
+            <input type="hidden" name="id" value={id} />
+            <label className="block text-xs text-zinc-500">
+              Phone number ID (lo da Meta, no es el n&uacute;mero telef&oacute;nico)
+              <input
+                name="phone_number_id"
+                defaultValue={wa.phone_number_id ?? ""}
+                placeholder="123456789012345"
+                className={`mt-1 ${claseInput}`}
+              />
+            </label>
+            <label className="block text-xs text-zinc-500">
+              Access token{" "}
+              {wa.tiene_token && "(ya hay uno guardado; dejalo vacio para no cambiarlo)"}
+              <input
+                name="access_token"
+                type="password"
+                autoComplete="off"
+                placeholder={wa.tiene_token ? "••••••••" : "EAAG..."}
+                className={`mt-1 ${claseInput}`}
+              />
+            </label>
+            <div className="flex gap-2">
+              <Boton>Guardar WhatsApp</Boton>
+            </div>
+          </Formulario>
+
+          {wa.tiene_token && (
+            <Formulario accion={borrarTokenWhatsApp} className="mt-3">
+              <input type="hidden" name="id" value={id} />
+              <Boton variante="peligro">Borrar token</Boton>
+            </Formulario>
+          )}
         </Seccion>
 
         {/* --- Consumo --- */}

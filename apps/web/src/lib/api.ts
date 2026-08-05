@@ -118,6 +118,29 @@ export const borrarDocumento = (id: string, docId: string) =>
 
 export const verUso = (id: string) => pedir<Uso>(`/tenants/${id}/usage`);
 
+export type WhatsApp = {
+  phone_number_id: string | null;
+  tiene_token: boolean;
+  configurado: boolean;
+};
+
+export const verWhatsApp = (id: string) => pedir<WhatsApp>(`/tenants/${id}/whatsapp`);
+
+/**
+ * `access_token` en undefined deja el token guardado como esta; en "" lo borra.
+ * Asi se puede corregir el numero sin tener que volver a pegar el token (que la
+ * API no devuelve nunca).
+ */
+export const guardarWhatsApp = (
+  id: string,
+  datos: { phone_number_id?: string; access_token?: string },
+) =>
+  pedir<WhatsApp>(`/tenants/${id}/whatsapp`, {
+    method: "PATCH",
+    headers: json,
+    body: JSON.stringify(datos),
+  });
+
 export const listarClaves = (id: string) => pedir<Clave[]>(`/tenants/${id}/keys`);
 
 export const emitirClave = (id: string, name: string, scopes: string[]) =>
