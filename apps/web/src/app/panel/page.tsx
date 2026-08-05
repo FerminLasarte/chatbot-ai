@@ -4,7 +4,8 @@ import { redirect } from "next/navigation";
 import { ErrorApi, listarClientes } from "@/lib/api";
 import { haySesion } from "@/lib/session";
 import { nuevoCliente, salir } from "./acciones";
-import { Boton, Formulario, claseInput } from "./ui";
+import { Boton, Formulario } from "./ui";
+import { claseInput } from "@/lib/estilos";
 
 export const metadata = { title: "Panel — clientes" };
 

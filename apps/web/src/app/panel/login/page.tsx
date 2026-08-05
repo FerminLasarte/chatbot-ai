@@ -2,7 +2,8 @@ import { redirect } from "next/navigation";
 
 import { haySesion } from "@/lib/session";
 import { entrar } from "../acciones";
-import { Boton, Formulario, claseInput } from "../ui";
+import { Boton, Formulario } from "../ui";
+import { claseInput } from "@/lib/estilos";
 
 export const metadata = { title: "Panel — ingresar" };
 

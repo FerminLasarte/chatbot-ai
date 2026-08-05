@@ -16,7 +16,12 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.routes import chat as chat_route
-from app.core.security import generate_api_key, hash_api_key, verify_api_key
+from app.core.security import (
+    KEY_PREFIX_LEN,
+    generate_api_key,
+    hash_api_key,
+    verify_api_key,
+)
 from app.main import app
 from app.models.api_key import ApiKey, Scope
 from app.models.tenant import Tenant
@@ -62,10 +67,11 @@ async def escenario(db: AsyncSession) -> AsyncIterator[dict]:
     await db.refresh(a)
     await db.refresh(b)
 
+    clave_admin = await _crear_clave(db, [Scope.ADMIN], None)
     datos = {
         "tenant_a": a,
         "tenant_b": b,
-        "admin": await _crear_clave(db, [Scope.ADMIN], None),
+        "admin": clave_admin,
         "tenant_a_key": await _crear_clave(db, [Scope.TENANT], a.id),
         "chat_a_key": await _crear_clave(db, [Scope.CHAT], a.id),
         "revocada": await _crear_clave(db, [Scope.TENANT], a.id, revocada=True),
@@ -78,7 +84,11 @@ async def escenario(db: AsyncSession) -> AsyncIterator[dict]:
     for t in (a, b):
         await db.execute(delete(ApiKey).where(ApiKey.tenant_id == t.id))
         await db.execute(delete(Tenant).where(Tenant.id == t.id))
-    await db.execute(delete(ApiKey).where(ApiKey.tenant_id.is_(None)))
+    # Solo la clave admin que creo ESTE test. Borrar todas las que tienen
+    # tenant_id NULL barreria cualquier clave admin real de la base local
+    # -que es justo la que usa el panel-, y el sintoma aparece despues, lejos
+    # de aca: el panel deja de funcionar sin motivo aparente.
+    await db.execute(delete(ApiKey).where(ApiKey.key_prefix == clave_admin[:KEY_PREFIX_LEN]))
     await db.commit()
 
 

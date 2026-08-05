@@ -11,7 +11,8 @@ import {
   revocarClave,
   subirDocumento,
 } from "../acciones";
-import { Boton, Formulario, FormularioClave, claseInput } from "../ui";
+import { Boton, Formulario, FormularioClave } from "../ui";
+import { claseInput } from "@/lib/estilos";
 
 export const metadata = { title: "Panel — cliente" };
 
