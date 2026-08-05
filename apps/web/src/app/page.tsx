@@ -98,7 +98,7 @@ export default function Home() {
   }
 
   return (
-    <div className="flex min-h-full flex-col items-center bg-zinc-50 px-4 py-10 dark:bg-black">
+    <div className="flex flex-1 flex-col items-center bg-zinc-50 px-4 py-10 dark:bg-black">
       <div className="flex w-full max-w-2xl flex-col gap-6">
         <header>
           <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-50">

@@ -72,21 +72,35 @@ Otro servicio desde el mismo repo. En Settings:
 
 ### Variables de entorno
 
-| Variable | Valor |
-| --- | --- |
-| `NEXT_PUBLIC_API_URL` | `https://TU-API.up.railway.app` (la URL del servicio API) |
-| `NEXT_PUBLIC_API_KEY` | una clave del tenant de demo (ver aviso de abajo) |
+| Variable | Valor | Llega al navegador? |
+| --- | --- | --- |
+| `NEXT_PUBLIC_API_URL` | `https://TU-API.up.railway.app` | si |
+| `NEXT_PUBLIC_API_KEY` | clave del tenant de demo (ver aviso) | **si** |
+| `API_URL` | `https://TU-API.up.railway.app` | no |
+| `ADMIN_API_KEY` | tu clave admin | no |
+| `PANEL_PASSWORD` | la contrasena para entrar a `/panel` | no |
+| `PANEL_SECRET` | `openssl rand -hex 32` | no |
 
-> **Estas dos se incrustan en el build, no se leen en runtime.** Es como
-> funciona `NEXT_PUBLIC_*` en Next. Consecuencia practica: **si las cambias,
-> hay que redesplegar el servicio Web**, no alcanza con reiniciarlo.
+Las cuatro de abajo **no** llevan `NEXT_PUBLIC_` a proposito: se leen solo en el
+servidor. Es lo que permite que el panel use una clave admin sin exponerla.
 
-> **AVISO DE SEGURIDAD.** `NEXT_PUBLIC_API_KEY` queda dentro del JavaScript que
-> se descarga cualquiera que abra la pagina — es publica por definicion. Hoy la
-> pagina de demo usa una clave con scope `tenant`, que **puede subir
-> documentos**. Mientras la web sea una demo con un tenant de prueba, el riesgo
-> es acotado. **No apuntes esta pagina al tenant de un cliente real** hasta que
-> el panel de administracion maneje las credenciales del lado del servidor.
+> **Las dos `NEXT_PUBLIC_*` se incrustan en el build, no se leen en runtime.**
+> Consecuencia practica: **si las cambias, hay que redesplegar el servicio
+> Web**, no alcanza con reiniciarlo. Las otras cuatro si se leen en runtime.
+
+> **AVISO SOBRE LA PAGINA DE DEMO (`/`).** `NEXT_PUBLIC_API_KEY` queda dentro
+> del JavaScript que descarga cualquiera que abra la pagina — es publica por
+> definicion. Esa pagina usa una clave con scope `tenant`, que **puede subir
+> documentos**. Con un tenant de demo el riesgo es acotado; **no la apuntes al
+> tenant de un cliente real**. Para clientes reales, emiti desde el panel una
+> clave con scope `chat`, que solo puede conversar.
+
+### Panel de administracion
+
+Queda en `https://TU-WEB.up.railway.app/panel`, protegido con `PANEL_PASSWORD`.
+Desde ahi se crean clientes, se edita su comportamiento, se suben y borran sus
+documentos, se ajusta su tope mensual y se emiten sus claves — sin tocar
+`/docs` ni la linea de comandos.
 
 ## 4. Primer arranque
 

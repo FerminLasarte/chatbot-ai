@@ -7,19 +7,23 @@ Reparto de permisos:
 
 import uuid
 from datetime import UTC, datetime
+from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, status
-from sqlalchemy import select
+from fastapi import APIRouter, File, HTTPException, UploadFile, status
+from sqlalchemy import func, select
 
+from app.ai.rag.extract import ExtraccionFallida, extract_text
+from app.ai.rag.ingest import ingest_document
 from app.api.v1.deps import AdminKey, CurrentTenant, DbSession, TenantKey
 from app.core.config import settings
 from app.core.security import generate_api_key
 from app.models.api_key import ApiKey, Scope
-from app.models.tenant import Tenant
+from app.models.tenant import Chunk, Document, Tenant
 from app.schemas.chat import (
     ApiKeyCreate,
     ApiKeyCreated,
     ApiKeyRead,
+    DocumentRead,
     LimitUpdate,
     PromptUpdate,
     TenantCreate,
@@ -205,3 +209,105 @@ async def read_usage_admin(tenant_id: uuid.UUID, db: DbSession, _: AdminKey) -> 
     if tenant is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "cliente no encontrado")
     return _to_usage(await quota.consumo_actual(db, tenant))
+
+
+@router.patch("/{tenant_id}/prompt", response_model=TenantRead)
+async def update_prompt_admin(
+    tenant_id: uuid.UUID, payload: PromptUpdate, db: DbSession, _: AdminKey
+) -> TenantRead:
+    """Igual que /me/prompt, pero para la agencia sobre cualquier cliente.
+
+    El cliente se identifica en la URL, no por la clave: una clave admin no
+    tiene tenant asociado a proposito, asi que siempre hay que decir sobre cual
+    se opera.
+    """
+    tenant = await db.get(Tenant, tenant_id)
+    if tenant is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "cliente no encontrado")
+
+    tenant.system_prompt = payload.system_prompt
+    await db.commit()
+    await db.refresh(tenant)
+    return _to_read(tenant)
+
+
+# ---------------------------------------------------------------------------
+# Documentos de un cliente (vista de la agencia)
+#
+# Duplican a proposito lo que /knowledge/documents hace con clave de cliente:
+# el panel se autentica como admin y no tiene -ni deberia tener- la clave de
+# cada cliente para subirle un archivo.
+# ---------------------------------------------------------------------------
+
+
+async def _tenant_o_404(db: DbSession, tenant_id: uuid.UUID) -> Tenant:
+    tenant = await db.get(Tenant, tenant_id)
+    if tenant is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "cliente no encontrado")
+    return tenant
+
+
+@router.post(
+    "/{tenant_id}/documents",
+    response_model=DocumentRead,
+    status_code=status.HTTP_201_CREATED,
+)
+async def upload_document_admin(
+    tenant_id: uuid.UUID,
+    db: DbSession,
+    file: Annotated[UploadFile, File()],
+    _: AdminKey,
+) -> DocumentRead:
+    tenant = await _tenant_o_404(db, tenant_id)
+
+    raw = await file.read()
+    filename = file.filename or "sin-titulo"
+    try:
+        text = extract_text(filename, raw)
+    except ExtraccionFallida as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
+
+    document = await ingest_document(db, tenant.id, title=filename, text=text)
+    count = await db.scalar(
+        select(func.count()).select_from(Chunk).where(Chunk.document_id == document.id)
+    )
+    return DocumentRead(id=str(document.id), title=document.title, chunks=count or 0)
+
+
+@router.get("/{tenant_id}/documents", response_model=list[DocumentRead])
+async def list_documents_admin(
+    tenant_id: uuid.UUID, db: DbSession, _: AdminKey
+) -> list[DocumentRead]:
+    stmt = (
+        select(Document, func.count(Chunk.id))
+        .outerjoin(Chunk, Chunk.document_id == Document.id)
+        .where(Document.tenant_id == tenant_id)
+        .group_by(Document.id)
+        .order_by(Document.created_at.desc())
+    )
+    rows = await db.execute(stmt)
+    return [DocumentRead(id=str(d.id), title=d.title, chunks=n) for d, n in rows.all()]
+
+
+@router.delete(
+    "/{tenant_id}/documents/{document_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_document_admin(
+    tenant_id: uuid.UUID, document_id: uuid.UUID, db: DbSession, _: AdminKey
+) -> None:
+    """Borra un documento y, por cascada, sus fragmentos.
+
+    Hace falta de verdad: cuando un cliente actualiza su tarifario, el PDF viejo
+    tiene que salir de la base o el bot mezcla precios viejos con nuevos y
+    responde cualquier cosa.
+
+    ★ El filtro por tenant_id NO es opcional: sin el, un document_id de otro
+    cliente entraria por aca y se borraria.
+    """
+    document = await db.get(Document, document_id)
+    if document is None or document.tenant_id != tenant_id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "documento no encontrado")
+
+    await db.delete(document)
+    await db.commit()
