@@ -15,6 +15,7 @@ import {
   borrarDocumento,
   borrarTokenWhatsApp,
   emitirClave,
+  generarLinkOnboarding,
   guardarLimite,
   guardarPrompt,
   guardarWhatsApp,
@@ -23,7 +24,7 @@ import {
   revocarClave,
   subirDocumento,
 } from "../acciones";
-import { Boton, Formulario, FormularioClave } from "../ui";
+import { Boton, Formulario, FormularioClave, FormularioLinkOnboarding } from "../ui";
 import { claseInput } from "@/lib/estilos";
 
 export const metadata = { title: "Panel — cliente" };
@@ -145,39 +146,57 @@ export default async function Cliente({ params }: { params: Promise<{ id: string
             )}
           </p>
 
-          <Formulario accion={guardarWhatsApp} className="flex flex-col gap-3">
-            <input type="hidden" name="id" value={id} />
-            <label className="block text-xs text-zinc-500">
-              Phone number ID (lo da Meta, no es el n&uacute;mero telef&oacute;nico)
-              <input
-                name="phone_number_id"
-                defaultValue={wa.phone_number_id ?? ""}
-                placeholder="123456789012345"
-                className={`mt-1 ${claseInput}`}
-              />
-            </label>
-            <label className="block text-xs text-zinc-500">
-              Access token{" "}
-              {wa.tiene_token && "(ya hay uno guardado; dejalo vacio para no cambiarlo)"}
-              <input
-                name="access_token"
-                type="password"
-                autoComplete="off"
-                placeholder={wa.tiene_token ? "••••••••" : "EAAG..."}
-                className={`mt-1 ${claseInput}`}
-              />
-            </label>
-            <div className="flex gap-2">
-              <Boton>Guardar WhatsApp</Boton>
-            </div>
-          </Formulario>
+          <FormularioLinkOnboarding
+            accion={generarLinkOnboarding}
+            tenantId={id}
+            yaConectado={wa.configurado}
+          />
 
-          {wa.tiene_token && (
-            <Formulario accion={borrarTokenWhatsApp} className="mt-3">
+          {/* La carga a mano sigue existiendo, pero plegada: es la salida de
+              emergencia, no el camino normal. */}
+          <details className="mt-5">
+            <summary className="cursor-pointer text-xs text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300">
+              Cargar las credenciales a mano
+            </summary>
+            <p className="mt-2 mb-3 text-xs text-zinc-500">
+              Solo hace falta si el cliente no puede usar el link (por ejemplo, si su
+              n&uacute;mero ya estaba dado de alta en otra App de Meta).
+            </p>
+
+            <Formulario accion={guardarWhatsApp} className="flex flex-col gap-3">
               <input type="hidden" name="id" value={id} />
-              <Boton variante="peligro">Borrar token</Boton>
+              <label className="block text-xs text-zinc-500">
+                Phone number ID (lo da Meta, no es el n&uacute;mero telef&oacute;nico)
+                <input
+                  name="phone_number_id"
+                  defaultValue={wa.phone_number_id ?? ""}
+                  placeholder="123456789012345"
+                  className={`mt-1 ${claseInput}`}
+                />
+              </label>
+              <label className="block text-xs text-zinc-500">
+                Access token{" "}
+                {wa.tiene_token && "(ya hay uno guardado; dejalo vacio para no cambiarlo)"}
+                <input
+                  name="access_token"
+                  type="password"
+                  autoComplete="off"
+                  placeholder={wa.tiene_token ? "••••••••" : "EAAG..."}
+                  className={`mt-1 ${claseInput}`}
+                />
+              </label>
+              <div className="flex gap-2">
+                <Boton>Guardar WhatsApp</Boton>
+              </div>
             </Formulario>
-          )}
+
+            {wa.tiene_token && (
+              <Formulario accion={borrarTokenWhatsApp} className="mt-3">
+                <input type="hidden" name="id" value={id} />
+                <Boton variante="peligro">Borrar token</Boton>
+              </Formulario>
+            )}
+          </details>
         </Seccion>
 
         {/* --- Conversaciones --- */}

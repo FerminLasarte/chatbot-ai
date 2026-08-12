@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 
 import { claseInput } from "@/lib/estilos";
 import type { Estado } from "./acciones";
@@ -109,3 +109,63 @@ export function FormularioClave({
   );
 }
 
+/**
+ * Genera el link de onboarding y lo deja listo para copiar y pegar.
+ *
+ * Componente propio y no un `Formulario` porque el link hay que mostrarlo y
+ * copiarlo, y eso necesita estado en el cliente (ver la nota de `Formulario`
+ * sobre por que esto no se puede resolver con un render-prop).
+ */
+export function FormularioLinkOnboarding({
+  accion,
+  tenantId,
+  yaConectado,
+}: {
+  accion: (estado: Estado, form: FormData) => Promise<Estado>;
+  tenantId: string;
+  yaConectado: boolean;
+}) {
+  const [estado, ejecutar] = useActionState(accion, VACIO);
+  const [copiado, setCopiado] = useState(false);
+
+  async function copiar(url: string) {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 2000);
+    } catch {
+      // Sin permiso de portapapeles (o sin https) el link queda igual a la
+      // vista para seleccionarlo a mano: no hace falta avisar nada.
+    }
+  }
+
+  return (
+    <form action={ejecutar} className="flex flex-col gap-3">
+      <input type="hidden" name="id" value={tenantId} />
+      <div>
+        <Boton variante={yaConectado ? "suave" : "normal"}>
+          {estado.link ? "Generar otro link" : "Generar link para el cliente"}
+        </Boton>
+      </div>
+
+      {estado.link && (
+        <div className="flex flex-col gap-2">
+          <code className="block overflow-x-auto rounded-md bg-zinc-100 p-3 text-xs dark:bg-zinc-800">
+            {estado.link}
+          </code>
+          <div>
+            <button
+              type="button"
+              onClick={() => copiar(estado.link!)}
+              className="rounded-md border border-zinc-300 px-3 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+            >
+              {copiado ? "Copiado" : "Copiar link"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      <Aviso estado={estado} />
+    </form>
+  );
+}

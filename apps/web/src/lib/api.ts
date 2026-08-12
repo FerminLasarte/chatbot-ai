@@ -141,6 +141,15 @@ export const guardarWhatsApp = (
     body: JSON.stringify(datos),
   });
 
+export type LinkOnboarding = { url: string; expira_at: string };
+
+/**
+ * Emite el link con el que el cliente conecta su WhatsApp solo, sin entrar al
+ * panel ni tocar Business Manager. Se le manda por mail o WhatsApp.
+ */
+export const generarLinkOnboarding = (id: string) =>
+  pedir<LinkOnboarding>(`/tenants/${id}/onboarding-link`, { method: "POST" });
+
 export type Conversacion = {
   id: string;
   channel: string;

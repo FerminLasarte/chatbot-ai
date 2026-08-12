@@ -26,6 +26,7 @@ from app.schemas.chat import (
     ApiKeyRead,
     DocumentRead,
     LimitUpdate,
+    OnboardingLink,
     PromptUpdate,
     TenantCreate,
     TenantRead,
@@ -33,7 +34,7 @@ from app.schemas.chat import (
     WhatsAppRead,
     WhatsAppUpdate,
 )
-from app.services import quota, whatsapp
+from app.services import onboarding, quota, whatsapp
 
 router = APIRouter(prefix="/tenants", tags=["tenants"])
 
@@ -269,6 +270,21 @@ async def update_whatsapp(
         tiene_token=bool(tenant.whatsapp_access_token_cifrado),
         configurado=whatsapp.tiene_whatsapp(tenant),
     )
+
+
+@router.post("/{tenant_id}/onboarding-link", response_model=OnboardingLink)
+async def emitir_link_de_onboarding(
+    tenant_id: uuid.UUID, db: DbSession, _: AdminKey
+) -> OnboardingLink:
+    """Genera el link con el que el cliente conecta su WhatsApp por su cuenta.
+
+    Se le manda por mail o WhatsApp y con eso alcanza: el cliente no entra al
+    panel ni toca Business Manager. Vence solo (ver `onboarding_link_ttl_hours`);
+    si se pasa, se emite otro desde aca.
+    """
+    tenant = await _tenant_o_404(db, tenant_id)
+    link = onboarding.emitir(tenant.id)
+    return OnboardingLink(url=link.url, expira_at=link.expira_at)
 
 
 @router.patch("/{tenant_id}/prompt", response_model=TenantRead)

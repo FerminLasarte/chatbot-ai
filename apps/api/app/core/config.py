@@ -85,6 +85,31 @@ class Settings(BaseSettings):
     whatsapp_app_secret: str = ""
     whatsapp_api_version: str = "v21.0"
 
+    # --- Alta de clientes por Embedded Signup ---
+    # Estos dos SI son publicos: viajan al navegador porque los necesita el SDK
+    # de Facebook para abrir el popup. No son secretos —el que si lo es, y nunca
+    # sale del servidor, es whatsapp_app_secret, con el que se canjea el `code`
+    # que devuelve el popup por el access token del cliente.
+    #
+    # El config_id no se programa: se genera en el Meta App Dashboard
+    # (WhatsApp -> Configuracion -> Embedded Signup) y se pega aca. Define que
+    # permisos pide el popup y que pasos ve el cliente.
+    whatsapp_app_id: str = ""
+    whatsapp_config_id: str = ""
+
+    # Cuanto vive el link de onboarding que se le manda al cliente.
+    #
+    # No es de un solo uso a proposito: si lo fuera, un cliente que abre el link,
+    # cierra el popup a mitad de camino y vuelve a entrar se encontraria con un
+    # link muerto y habria que emitirle otro a mano. Con vencimiento puede
+    # reintentar solo, que es el caso comun. El link no da acceso a nada del
+    # cliente: solo permite conectarle un WhatsApp (ver services/onboarding.py).
+    onboarding_link_ttl_hours: int = 72
+
+    # Base sobre la que se arma el link que se le pasa al cliente. Es el frontend,
+    # no la API: la pagina de onboarding vive en el panel (apps/web).
+    onboarding_base_url: str = "http://localhost:3000"
+
     # --- Cifrado de credenciales de terceros ---
     # Clave Fernet para el access token de WhatsApp de cada cliente. Generar con:
     #   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
@@ -139,6 +164,11 @@ class Settings(BaseSettings):
             problemas.append("CORS_ORIGINS con '*'")
         if any(o.startswith("http://") for o in self.cors_origins):
             problemas.append("CORS_ORIGINS con http:// (tiene que ser https)")
+        # El link de onboarding lleva el token en la URL y se manda por WhatsApp
+        # o mail. Sobre http viaja en claro y cualquiera en el camino podria
+        # conectarle un WhatsApp al cliente.
+        if self.onboarding_base_url.startswith("http://"):
+            problemas.append("ONBOARDING_BASE_URL con http:// (tiene que ser https)")
 
         if problemas:
             raise ValueError(

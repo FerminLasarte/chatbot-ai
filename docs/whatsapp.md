@@ -30,10 +30,20 @@ ella.
 | --- | --- | --- |
 | App Secret | Configuracion de la App -> Basica -> "Clave secreta" | `WHATSAPP_APP_SECRET` |
 | Verify Token | Lo inventas vos | `WHATSAPP_VERIFY_TOKEN` |
+| App ID | Arriba de todo en el panel de la App | `WHATSAPP_APP_ID` |
+| Config ID | WhatsApp -> Configuracion -> Embedded Signup | `WHATSAPP_CONFIG_ID` |
+| URL del panel | La tuya | `ONBOARDING_BASE_URL` |
 
 El Verify Token ya esta generado y cargado en Railway. **Falta el App Secret**:
 sin el, todos los mensajes entrantes se rechazan con 401 (la firma no se puede
 validar).
+
+El App ID y el Config ID son **publicos**: viajan al navegador del cliente
+porque los necesita el SDK de Facebook. El App Secret nunca sale del servidor.
+
+`ONBOARDING_BASE_URL` tiene que ser **https** en produccion o la API no
+arranca: el link de onboarding lleva un token en la URL y sobre http viajaria
+en claro.
 
 ## Paso 3 — Registrar el webhook
 
@@ -46,9 +56,44 @@ En WhatsApp -> Configuracion -> Webhooks:
   pero nunca envia nada, y el sintoma es un bot que "no responde" sin ningun
   error visible.
 
-## Paso 4 — Datos de cada cliente (en el panel)
+## Paso 4 — Generar el Config ID del alta
 
-Por cada negocio que conectes, en `/panel/{cliente}` -> seccion WhatsApp:
+En **WhatsApp -> Configuracion -> Embedded Signup**, crea una configuracion.
+Ahi se define que permisos pide el popup y que pasos ve el cliente. Meta te
+devuelve un `config_id`: eso va en `WHATSAPP_CONFIG_ID`.
+
+No es codigo, es un dato de configuracion. Sin el, la pagina de onboarding
+responde 503 a proposito, para que el error lo veas vos y no el cliente frente
+a un popup de Facebook que muere sin explicacion.
+
+## Paso 5 — Dar de alta un cliente
+
+El cliente **no toca nada de Meta**. El flujo es:
+
+1. En `/panel/{cliente}` -> seccion WhatsApp -> **Generar link para el
+   cliente**.
+2. Le mandas ese link por mail o WhatsApp. Vence en 72 horas
+   (`ONBOARDING_LINK_TTL_HOURS`); si se pasa, generas otro.
+3. El cliente abre el link, toca "Conectar WhatsApp", entra con su cuenta de
+   Facebook y elige o crea su numero.
+4. Al terminar, el servidor canjea el codigo por un token permanente, engancha
+   el webhook a la cuenta del cliente y registra el numero. Queda listo.
+
+Lo que hace el link, y lo que no: solo permite ver el nombre del cliente y
+conectarle un WhatsApp si todavia no tiene. No da acceso a conversaciones, ni
+documentos, ni consumo, y **no pisa un WhatsApp ya conectado**. Para cambiar un
+numero hay que desconectarlo primero desde el panel.
+
+Si algo falla contra Meta, no se guarda nada a medias: el cliente sigue
+figurando como desconectado y puede reintentar con el mismo link. La unica
+excepcion es el registro del numero, que si falla deja el alta hecha con una
+advertencia (pasa cuando el numero ya tenia verificacion en dos pasos con otro
+PIN).
+
+### Carga a mano (plan B)
+
+En la misma seccion, plegado bajo "Cargar las credenciales a mano", siguen los
+campos de siempre:
 
 | Campo | Que es |
 | --- | --- |
@@ -56,6 +101,8 @@ Por cada negocio que conectes, en `/panel/{cliente}` -> seccion WhatsApp:
 | Access token | Autoriza a enviar en nombre de ese numero. |
 
 Se guarda cifrado y la API no lo devuelve nunca: solo informa si esta cargado.
+Sirve para los casos que el alta automatica no cubre, por ejemplo un numero ya
+dado de alta en otra App de Meta.
 
 ## Probar antes de tener un cliente real
 
@@ -66,6 +113,44 @@ completo, con dos limitaciones:
 - El numero de prueba solo puede escribirle a numeros que registres a mano en
   esa misma pantalla (hasta 5).
 - El token vence a las 24 h: sirve para probar, no para dejarlo andando.
+
+## Tramites de Meta: el cuello de botella real
+
+El alta automatica funciona en modo desarrollo con cuentas agregadas como
+**tester** de la App. Para que la use un cliente real hacen falta tres tramites
+de Meta que no dependen del codigo y que son **lo que mas tiempo va a consumir**.
+
+Conviene arrancarlos EN PARALELO con el desarrollo, no despues.
+
+| Tramite | Donde | Cuanto tarda |
+| --- | --- | --- |
+| Verificacion de la empresa | Business Manager -> Configuracion empresarial -> Seguridad -> Verificacion | Dias |
+| Acceso avanzado (App Review) | Panel de la App -> Revision de la app | Dias a un par de semanas |
+| Publicar la App | Panel de la App | Inmediato, una vez cumplido lo anterior |
+
+**Verificacion de la empresa** es sobre *tu* empresa, no la del cliente.
+
+**Acceso avanzado** hay que pedirlo para los permisos
+`whatsapp_business_management` y `whatsapp_business_messaging`. Meta pide:
+
+- Un screencast del flujo de Embedded Signup funcionando de punta a punta. Se
+  puede grabar con una cuenta de prueba agregada como tester, antes de tener
+  cliente real.
+- URL de politica de privacidad y de terminos de servicio.
+- Descripcion del caso de uso (bot de atencion al cliente por WhatsApp para
+  PyMEs).
+
+**Publicar la App** ademas exige icono, categoria y el Data Use Checkup
+completo.
+
+### Orden recomendado
+
+1. Arrancar la verificacion de empresa (es lo mas lento y no depende de nada).
+2. En paralelo, probar el alta con una cuenta agregada como tester. Esto ya
+   funciona sin esperar ninguna aprobacion.
+3. Grabar el screencast y pedir el Acceso avanzado.
+4. Publicar la App cuando Meta apruebe.
+5. Recien ahi un cliente real puede pasar por el flujo sin ser tester.
 
 ## Para produccion de verdad
 
@@ -78,9 +163,9 @@ completo, con dos limitaciones:
   problema (siempre contesta dentro de la ventana), pero si algun dia se quiere
   escribir primero, hay que aprobar plantillas.
 
-## Limite pendiente
+## Limite de embeddings (resuelto)
 
-El proveedor de embeddings esta en 3 requests por minuto (plan sin medio de
-pago). Por WhatsApp los mensajes llegan en rafagas: si tres personas escriben
-en el mismo minuto, la tercera recibe el mensaje de disculpas. Conviene
-destrabarlo antes de conectar clientes reales.
+El proveedor de embeddings estuvo un tiempo en 3 requests por minuto (plan sin
+medio de pago), lo que con trafico real de WhatsApp se notaba enseguida: si tres
+personas escribian en el mismo minuto, la tercera recibia el mensaje de
+disculpas. Ya esta destrabado.

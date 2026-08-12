@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 import * as api from "@/lib/api";
 import { cerrarSesion, crearSesion, haySesion, passwordCorrecta } from "@/lib/session";
 
-export type Estado = { error?: string; ok?: string; clave?: string };
+export type Estado = { error?: string; ok?: string; clave?: string; link?: string };
 
 /**
  * ★ Toda accion que toque datos pasa por aca primero.
@@ -150,6 +150,27 @@ export async function guardarWhatsApp(_estado: Estado, form: FormData): Promise<
   }
   revalidatePath(`/panel/${id}`);
   return { ok: "WhatsApp actualizado." };
+}
+
+export async function generarLinkOnboarding(_estado: Estado, form: FormData): Promise<Estado> {
+  await exigirSesion();
+  const id = String(form.get("id") ?? "");
+
+  try {
+    const link = await api.generarLinkOnboarding(id);
+
+    // ★ Se muestra cuanto FALTA, no la fecha de vencimiento. Esta accion corre
+    // en el servidor (Railway, en UTC): formatear ahi una fecha mostraria una
+    // hora que no es la de quien esta mirando el panel. Una duracion no depende
+    // de la zona horaria de nadie. Mismo criterio que los derivados de
+    // Conversacion (ver la nota de `minutos_restantes` en lib/api.ts).
+    const horas = Math.round((new Date(link.expira_at).getTime() - Date.now()) / 3_600_000);
+    const cuanto = horas >= 48 ? `${Math.round(horas / 24)} dias` : `${horas} horas`;
+
+    return { link: link.url, ok: `Mandaselo al cliente. Vence en ${cuanto}.` };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "no se pudo generar el link" };
+  }
 }
 
 export async function borrarTokenWhatsApp(_estado: Estado, form: FormData): Promise<Estado> {

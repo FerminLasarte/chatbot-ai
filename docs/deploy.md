@@ -49,14 +49,25 @@ catalogo) en vez de la de Postgres a secas.
 | `CORS_ORIGINS` | `["https://TU-WEB.up.railway.app"]` — la URL del servicio Web, con https |
 | `ANTHROPIC_API_KEY` | tu clave de Anthropic |
 | `VOYAGE_API_KEY` | tu clave de Voyage |
+| `ENCRYPTION_KEY` | cifra el token de WhatsApp de cada cliente (ver `.env.example`) |
+| `WHATSAPP_VERIFY_TOKEN` | el que pusiste en Meta al registrar el webhook |
+| `WHATSAPP_APP_SECRET` | Meta -> Configuracion de la App -> Basica |
+| `WHATSAPP_APP_ID` | Meta -> panel de la App |
+| `WHATSAPP_CONFIG_ID` | Meta -> WhatsApp -> Configuracion -> Embedded Signup |
+| `ONBOARDING_BASE_URL` | `https://TU-WEB.up.railway.app` — la URL del servicio Web, con https |
 
 `LLM_MODEL` y `EMBEDDINGS_MODEL` no hace falta setearlas: los defaults del
 codigo (`claude-haiku-4-5` y `voyage-4`) son los que elegimos con el eval.
 
 **Si la config es insegura, la API se niega a arrancar** (secreto de ejemplo,
-`DEBUG=true`, o CORS con `*` o `http://`). Es a proposito: un servidor que
-levanta con secretos de ejemplo parece que anda y el agujero recien se nota
-cuando alguien lo usa. El mensaje de error dice exactamente que corregir.
+`DEBUG=true`, CORS con `*` o `http://`, o `ONBOARDING_BASE_URL` sin https). Es a
+proposito: un servidor que levanta con secretos de ejemplo parece que anda y el
+agujero recien se nota cuando alguien lo usa. El mensaje de error dice
+exactamente que corregir.
+
+★ `ONBOARDING_BASE_URL` es la que mas facil se olvida, y **bloquea el arranque**:
+su default es `http://localhost:3000`, que no pasa la validacion de produccion.
+Apunta al servicio **Web**, no a la API: la pagina de onboarding vive en el panel.
 
 ### Migraciones
 

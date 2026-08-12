@@ -16,6 +16,7 @@ def _prod(**extra: object) -> Settings:
         "debug": False,
         "jwt_secret": "un-secreto-largo-y-aleatorio-de-verdad",
         "cors_origins": ["https://panel.midominio.com"],
+        "onboarding_base_url": "https://panel.midominio.com",
     }
     return Settings(**{**base, **extra})  # type: ignore[arg-type]
 
@@ -82,6 +83,21 @@ def test_produccion_rechaza_cors_abierto() -> None:
 def test_produccion_rechaza_cors_sin_https() -> None:
     with pytest.raises(ValueError, match="CORS"):
         _prod(cors_origins=["http://panel.midominio.com"])
+
+
+def test_produccion_rechaza_el_link_de_onboarding_sin_https() -> None:
+    """El link lleva un token en la URL y se manda por WhatsApp o mail: sobre
+    http viaja en claro y cualquiera en el camino podria usarlo."""
+    with pytest.raises(ValueError, match="ONBOARDING_BASE_URL"):
+        _prod(onboarding_base_url="http://panel.midominio.com")
+
+
+def test_produccion_rechaza_el_onboarding_apuntando_a_localhost() -> None:
+    """★ Es el default, asi que este es el caso que de verdad se le escapa a uno
+    al desplegar: sin esta guarda la API arranca feliz y le emite a los clientes
+    links a localhost, que no abren en ningun lado."""
+    with pytest.raises(ValueError, match="ONBOARDING_BASE_URL"):
+        _prod(onboarding_base_url="http://localhost:3000")
 
 
 def test_desarrollo_no_exige_nada_de_eso() -> None:

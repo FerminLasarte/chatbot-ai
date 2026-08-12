@@ -145,3 +145,52 @@ class ApiKeyCreated(ApiKeyRead):
     api_key: str
     is_active: bool = True
     last_used_at: datetime | None = None
+
+
+# ---------------------------------------------------------------------------
+# Alta de WhatsApp por Embedded Signup
+# ---------------------------------------------------------------------------
+
+
+class OnboardingLink(BaseModel):
+    """El link que la agencia le pasa al cliente para que conecte su WhatsApp."""
+
+    url: str
+    expira_at: datetime
+
+
+class OnboardingEstado(BaseModel):
+    """Lo que ve la pagina de onboarding al abrirse.
+
+    Incluye el App ID y el config_id porque el SDK de Facebook los necesita para
+    abrir el popup. Los dos son publicos por diseno; el App Secret nunca sale de
+    la API.
+    """
+
+    nombre_cliente: str
+    app_id: str
+    config_id: str
+    # Version de la Graph API con la que se inicializa el SDK, para que el
+    # navegador no tenga que tener su propia copia del numero.
+    api_version: str
+    # Si ya hay un WhatsApp conectado, la pagina no ofrece conectar otro.
+    ya_conectado: bool
+
+
+class OnboardingConectar(BaseModel):
+    """Lo que devuelve el popup de Facebook cuando el cliente termina.
+
+    El `code` es de un solo uso y dura pocos minutos: se canjea en el acto por el
+    access token del cliente, del lado del servidor.
+    """
+
+    code: str = Field(min_length=1, max_length=1000)
+    waba_id: str = Field(min_length=1, max_length=64)
+    phone_number_id: str = Field(min_length=1, max_length=64)
+
+
+class OnboardingResultado(BaseModel):
+    conectado: bool
+    # Presente cuando el alta quedo usable pero hay algo que mirar (hoy: el
+    # registro del numero). Se le muestra al cliente tal cual.
+    advertencia: str | None = None
