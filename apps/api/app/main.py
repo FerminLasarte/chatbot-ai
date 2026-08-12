@@ -8,7 +8,7 @@ from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api.v1.routes import chat, knowledge, tenants, webhooks
+from app.api.v1.routes import chat, conversations, knowledge, tenants, webhooks
 from app.core.config import settings
 from app.core.logging import setup_logging
 from app.core.retry import RetryableHTTPError
@@ -82,6 +82,7 @@ async def _proveedor_no_disponible(request: Request, exc: RetryableHTTPError) ->
 
 app.include_router(chat.router, prefix="/api/v1")
 app.include_router(tenants.router, prefix="/api/v1")
+app.include_router(conversations.router, prefix="/api/v1")
 app.include_router(knowledge.router, prefix="/api/v1")
 app.include_router(webhooks.router, prefix="/api/v1")
 

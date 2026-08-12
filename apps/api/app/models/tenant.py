@@ -5,7 +5,7 @@ no en un archivo. Asi el dashboard lo edita sin desplegar.
 """
 
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text, func
@@ -121,12 +121,28 @@ class Conversation(Base):
         DateTime(timezone=True), server_default=func.now(), index=True
     )
 
+    # Hasta cuando el bot NO contesta esta conversacion, porque alguien la esta
+    # atendiendo a mano desde la bandeja de Meta.
+    #
+    # ★ Es una fecha de vencimiento y no un booleano a proposito. Un interruptor
+    # se queda prendido: el dia que alguien se olvida de apagarlo, ese cliente
+    # deja de recibir respuestas para siempre y nadie se entera -no hay error,
+    # no hay log, solo silencio-. Con vencimiento el peor caso es que el bot
+    # vuelva unas horas mas tarde de lo ideal.
+    pausada_hasta: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
     # Mismo motivo que Tenant.documents.
     messages: Mapped[list["Message"]] = relationship(
         back_populates="conversation", passive_deletes=True
     )
 
     __table_args__ = (Index("ix_conversations_lookup", "tenant_id", "channel", "external_id"),)
+
+    def en_modo_manual(self, ahora: datetime | None = None) -> bool:
+        """Si la pausa sigue vigente. Una pausa vencida es como no tenerla."""
+        if self.pausada_hasta is None:
+            return False
+        return self.pausada_hasta > (ahora or datetime.now(UTC))
 
 
 class Message(Base):

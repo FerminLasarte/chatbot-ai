@@ -60,6 +60,13 @@ class Settings(BaseSettings):
     # la ventana de atencion al cliente de WhatsApp.
     conversation_idle_minutes: int = 1440
 
+    # --- Modo manual (atencion humana) ---
+    # Cuanto dura la pausa del bot cuando alguien toma una conversacion a mano
+    # desde la bandeja de Meta. Es el valor por defecto: el panel deja elegir
+    # otro al pausar. Ver el comentario de `Conversation.pausada_hasta` para por
+    # que la pausa vence en vez de quedar prendida hasta que alguien la apague.
+    manual_mode_hours: int = 8
+
     # --- Cuotas ---
     # Valor con el que nace cada cliente nuevo. Se puede ajustar por cliente
     # despues; esto es solo el default para no crear nunca uno sin tope.

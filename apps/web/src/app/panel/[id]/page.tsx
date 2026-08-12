@@ -1,7 +1,15 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
-import { listarClaves, listarClientes, listarDocumentos, verUso, verWhatsApp } from "@/lib/api";
+import {
+  listarClaves,
+  listarClientes,
+  listarConversaciones,
+  listarDocumentos,
+  verUso,
+  verWhatsApp,
+} from "@/lib/api";
+import type { Conversacion } from "@/lib/api";
 import { haySesion } from "@/lib/session";
 import {
   borrarDocumento,
@@ -10,6 +18,8 @@ import {
   guardarLimite,
   guardarPrompt,
   guardarWhatsApp,
+  pausarBot,
+  reanudarBot,
   revocarClave,
   subirDocumento,
 } from "../acciones";
@@ -23,14 +33,15 @@ export default async function Cliente({ params }: { params: Promise<{ id: string
 
   const { id } = await params;
 
-  // Se piden en paralelo: son cuatro consultas independientes y en serie
-  // sumarian sus latencias.
-  const [clientes, documentos, uso, claves, wa] = await Promise.all([
+  // Se piden en paralelo: son consultas independientes y en serie sumarian sus
+  // latencias.
+  const [clientes, documentos, uso, claves, wa, conversaciones] = await Promise.all([
     listarClientes(),
     listarDocumentos(id),
     verUso(id),
     listarClaves(id),
     verWhatsApp(id),
+    listarConversaciones(id),
   ]);
 
   const cliente = clientes.find((c) => c.id === id);
@@ -169,6 +180,22 @@ export default async function Cliente({ params }: { params: Promise<{ id: string
           )}
         </Seccion>
 
+        {/* --- Conversaciones --- */}
+        <Seccion
+          titulo="Conversaciones"
+          ayuda="Si queres atender a alguien vos mismo desde Meta Business Suite, pausa el bot en esa conversacion asi no te pisa la respuesta. La pausa se apaga sola."
+        >
+          {conversaciones.length === 0 ? (
+            <p className="text-sm text-zinc-500">Todav&iacute;a no hay conversaciones.</p>
+          ) : (
+            <ul className="flex flex-col gap-2">
+              {conversaciones.map((c) => (
+                <Hilo key={c.id} conversacion={c} tenantId={id} />
+              ))}
+            </ul>
+          )}
+        </Seccion>
+
         {/* --- Consumo --- */}
         <Seccion titulo="Consumo del mes" ayuda={`Periodo ${uso.period}.`}>
           <p className="text-sm text-zinc-900 dark:text-zinc-100">
@@ -231,6 +258,75 @@ export default async function Cliente({ params }: { params: Promise<{ id: string
       </div>
     </div>
   );
+}
+
+/** Una conversacion con su estado y el interruptor del modo manual. */
+function Hilo({ conversacion, tenantId }: { conversacion: Conversacion; tenantId: string }) {
+  const esWhatsApp = conversacion.channel === "whatsapp";
+  return (
+    <li className="rounded-md border border-zinc-200 px-3 py-2 dark:border-zinc-800">
+      <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
+        <span className="min-w-0">
+          <span className="block truncate text-sm text-zinc-900 dark:text-zinc-100">
+            {esWhatsApp ? `+${conversacion.external_id}` : conversacion.external_id}
+          </span>
+          {conversacion.ultimo_mensaje && (
+            <span className="block truncate text-xs text-zinc-500">
+              {conversacion.ultimo_mensaje}
+            </span>
+          )}
+          <span className="text-xs text-zinc-500">
+            {esWhatsApp ? "WhatsApp" : conversacion.channel} &middot; {conversacion.mensajes}{" "}
+            mensajes &middot; hace {duracion(conversacion.minutos_inactiva)}
+          </span>
+        </span>
+
+        {conversacion.minutos_restantes !== null && (
+          <span className="text-xs text-amber-700 dark:text-amber-400">
+            Lo atend&eacute;s vos &mdash; el bot vuelve en{" "}
+            {duracion(conversacion.minutos_restantes)}
+          </span>
+        )}
+      </div>
+
+      {conversacion.en_modo_manual ? (
+        <Formulario accion={reanudarBot} className="mt-2">
+          <input type="hidden" name="id" value={tenantId} />
+          <input type="hidden" name="conversacion_id" value={conversacion.id} />
+          <Boton>Que responda el bot</Boton>
+        </Formulario>
+      ) : (
+        <Formulario accion={pausarBot} className="mt-2 flex flex-wrap items-center gap-2">
+          <input type="hidden" name="id" value={tenantId} />
+          <input type="hidden" name="conversacion_id" value={conversacion.id} />
+          <select name="horas" defaultValue="8" className={`${claseInput} w-auto`}>
+            <option value="1">1 hora</option>
+            <option value="4">4 horas</option>
+            <option value="8">8 horas</option>
+            <option value="24">24 horas</option>
+          </select>
+          <Boton variante="suave">Pausar el bot</Boton>
+        </Formulario>
+      )}
+    </li>
+  );
+}
+
+/**
+ * Minutos -> texto corto ("40 min", "2 h 15 min", "3 d").
+ *
+ * Solo formatea: los minutos vienen calculados de la API. Ver el comentario de
+ * `Conversacion` en lib/api.ts para por que el reloj esta de aquel lado.
+ */
+function duracion(minutos: number): string {
+  if (minutos < 60) return `${minutos} min`;
+
+  const horas = Math.floor(minutos / 60);
+  if (horas < 24) {
+    const resto = minutos % 60;
+    return resto === 0 ? `${horas} h` : `${horas} h ${resto} min`;
+  }
+  return `${Math.floor(horas / 24)} d`;
 }
 
 function Seccion({

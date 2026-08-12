@@ -26,7 +26,7 @@ from app.core.logging import tenant_id_ctx
 from app.core.security import verify_meta_signature
 from app.db.session import SessionLocal
 from app.models.tenant import Tenant
-from app.services import inbox, whatsapp
+from app.services import conversation, inbox, whatsapp
 from app.services.conversation import answer
 from app.services.quota import QuotaExcedida
 
@@ -121,16 +121,41 @@ async def _handle(
             if tenant is None:
                 raise RuntimeError(f"el tenant {tenant_id} desaparecio entre el claim y el handle")
 
+            # La conversacion se reanuda por el numero del usuario final, dentro
+            # de la ventana de inactividad configurada.
+            conversacion = await conversation.resolver_conversacion(
+                db, tenant, channel="whatsapp", external_id=to_number
+            )
+
+            # ★ El unico punto de control del modo manual. Va ANTES de leer el
+            # token y de llamar al modelo: si alguien esta contestando a mano
+            # desde la bandeja de Meta, el bot no tiene que pisarle la respuesta
+            # -ni gastar en generar una que no se va a mandar-.
+            #
+            # El mensaje igual se guarda: cuando la pausa vence, el bot retoma
+            # con el historial completo en vez de con un agujero.
+            if conversacion.en_modo_manual():
+                await conversation.registrar_entrante(db, conversacion, text)
+                logger.info(
+                    "conversacion en modo manual: mensaje guardado sin responder",
+                    extra={"tenant_id": str(tenant_id), "conversation_id": str(conversacion.id)},
+                )
+                await inbox.mark_done(db, event_id)
+                return
+
             # Se lee antes de generar la respuesta: si falta la credencial, no
             # tiene sentido gastar en el LLM una respuesta que no se va a poder
             # entregar.
             token = whatsapp.leer_token(tenant)
 
             try:
-                # La conversacion se reanuda por el numero del usuario final,
-                # dentro de la ventana de inactividad configurada.
                 reply, _conversacion = await answer(
-                    db, tenant, text, channel="whatsapp", external_id=to_number
+                    db,
+                    tenant,
+                    text,
+                    channel="whatsapp",
+                    external_id=to_number,
+                    conversation_id=conversacion.id,
                 )
             except QuotaExcedida:
                 # No es un error: es politica. Se procesó, y el evento queda

@@ -164,6 +164,43 @@ export async function borrarTokenWhatsApp(_estado: Estado, form: FormData): Prom
   return { ok: "Token eliminado." };
 }
 
+// --- Modo manual ---
+
+export async function pausarBot(_estado: Estado, form: FormData): Promise<Estado> {
+  await exigirSesion();
+  const id = String(form.get("id") ?? "");
+  const conversacionId = String(form.get("conversacion_id") ?? "");
+  const horas = Number(form.get("horas") ?? "");
+
+  // El tope de una semana es el mismo que valida la API: no hay pausa
+  // indefinida, justamente para que un olvido no silencie al bot para siempre.
+  if (!Number.isInteger(horas) || horas < 1 || horas > 168) {
+    return { error: "Elegi por cuanto tiempo pausar el bot." };
+  }
+
+  try {
+    await api.pausarBot(id, conversacionId, horas);
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "no se pudo pausar" };
+  }
+  revalidatePath(`/panel/${id}`);
+  return { ok: `Bot pausado ${horas} h. Contesta vos desde Meta Business Suite.` };
+}
+
+export async function reanudarBot(_estado: Estado, form: FormData): Promise<Estado> {
+  await exigirSesion();
+  const id = String(form.get("id") ?? "");
+  const conversacionId = String(form.get("conversacion_id") ?? "");
+
+  try {
+    await api.reanudarBot(id, conversacionId);
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "no se pudo reactivar" };
+  }
+  revalidatePath(`/panel/${id}`);
+  return { ok: "El bot vuelve a responder en esta conversacion." };
+}
+
 // --- Claves ---
 
 export async function emitirClave(_estado: Estado, form: FormData): Promise<Estado> {

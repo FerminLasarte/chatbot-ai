@@ -87,6 +87,27 @@ async def answer(
     return respuesta.text, conversacion.id
 
 
+async def resolver_conversacion(
+    db: AsyncSession, tenant: Tenant, *, channel: str, external_id: str
+) -> Conversation:
+    """Abre o reanuda el hilo de un usuario final, sin generar ninguna respuesta.
+
+    La necesita el webhook: para saber si la conversacion esta en modo manual
+    hay que tenerla en la mano ANTES de decidir si se llama al modelo.
+    """
+    return await _reanudar_o_crear(db, tenant, channel=channel, external_id=external_id)
+
+
+async def registrar_entrante(db: AsyncSession, conversacion: Conversation, texto: str) -> None:
+    """Guarda un mensaje del usuario y nada mas.
+
+    Es el camino del modo manual: no se pierde el historial -la respuesta la
+    escribe una persona en otra ventana- pero no se genera ni se cobra nada.
+    """
+    await _guardar_mensaje(db, conversacion.id, ROL_USUARIO, texto)
+    await _tocar_actividad(db, conversacion)
+
+
 # ---------------------------------------------------------------------------
 # Identidad de la conversacion
 # ---------------------------------------------------------------------------
@@ -184,13 +205,26 @@ async def _cargar_historia(db: AsyncSession, conversation_id: uuid.UUID) -> list
     while recientes and recientes[0].role != ROL_USUARIO:
         recientes.pop(0)
 
-    historia: list[MessageParam] = [
-        MessageParam(
-            role="user" if m.role == ROL_USUARIO else "assistant",
-            content=[TextBlockParam(type="text", text=m.content)],
+    # Los mensajes seguidos del mismo rol se juntan en un turno.
+    #
+    # Hace falta por el modo manual: mientras el bot esta pausado se guardan
+    # mensajes del usuario sin ninguna respuesta en el medio, asi que al
+    # reanudar la historia trae varios turnos "user" pegados. Ademas de evitar
+    # discutir con la API sobre alternancia de roles, leerlos como una sola
+    # intervencion es mas fiel a lo que paso: el usuario escribio tres veces
+    # seguidas, no mantuvo tres intercambios.
+    historia: list[MessageParam] = []
+    for m in recientes:
+        rol = "user" if m.role == ROL_USUARIO else "assistant"
+        anterior = historia[-1] if historia else None
+        if anterior is not None and anterior["role"] == rol:
+            bloques = anterior["content"]
+            if isinstance(bloques, list):
+                bloques.append(TextBlockParam(type="text", text=m.content))
+                continue
+        historia.append(
+            MessageParam(role=rol, content=[TextBlockParam(type="text", text=m.content)])
         )
-        for m in recientes
-    ]
 
     # Breakpoint de cache sobre la cola de la historia. El prefijo de tools +
     # system solo (~326 tokens) no llega al minimo de 512 de Opus 5, asi que hoy

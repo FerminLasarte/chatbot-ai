@@ -84,6 +84,40 @@ class WhatsAppRead(BaseModel):
     configurado: bool
 
 
+class ConversationRead(BaseModel):
+    """Una conversacion en la vista del panel.
+
+    `external_id` es el numero del usuario final en WhatsApp: es lo unico que
+    permite reconocer con quien se esta hablando al ir a la bandeja de Meta.
+    """
+
+    id: str
+    channel: str
+    external_id: str
+    last_activity_at: datetime
+    pausada_hasta: datetime | None
+    # ★ Los tres derivados de abajo los calcula la API a proposito: el reloj lo
+    # tiene un solo lado. El panel se renderiza en el servidor -en Railway, en
+    # UTC-, asi que si comparara fechas por su cuenta mostraria horas que no son
+    # las del usuario. Aca solo llegan numeros ya resueltos, que el panel
+    # formatea ("hace 5 min", "vuelve en 2 h").
+    en_modo_manual: bool
+    minutos_inactiva: int
+    minutos_restantes: int | None
+    mensajes: int
+    ultimo_mensaje: str | None
+
+
+class ManualModeStart(BaseModel):
+    """Cuanto dura la pausa. Sin valor, se usa `settings.manual_mode_hours`.
+
+    El tope de una semana es a proposito: no existe la pausa indefinida. Ver el
+    comentario de `Conversation.pausada_hasta`.
+    """
+
+    horas: int | None = Field(default=None, ge=1, le=168)
+
+
 class DocumentRead(BaseModel):
     id: str
     title: str

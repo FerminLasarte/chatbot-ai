@@ -141,6 +141,42 @@ export const guardarWhatsApp = (
     body: JSON.stringify(datos),
   });
 
+export type Conversacion = {
+  id: string;
+  channel: string;
+  /** El numero del usuario final en WhatsApp: con esto se lo busca en la bandeja de Meta. */
+  external_id: string;
+  last_activity_at: string;
+  pausada_hasta: string | null;
+  /**
+   * ★ Estos tres los calcula la API. El panel no compara fechas: se renderiza
+   * en el servidor (Railway, en UTC) y cualquier cuenta que hiciera aca daria
+   * horas que no son las del usuario. Ademas leer el reloj durante el render
+   * rompe la regla de pureza de React.
+   */
+  en_modo_manual: boolean;
+  minutos_inactiva: number;
+  minutos_restantes: number | null;
+  mensajes: number;
+  ultimo_mensaje: string | null;
+};
+
+export const listarConversaciones = (id: string) =>
+  pedir<Conversacion[]>(`/tenants/${id}/conversations`);
+
+/** Silencia al bot en esa conversacion por `horas`. Repetirlo corre el vencimiento. */
+export const pausarBot = (id: string, conversacionId: string, horas: number) =>
+  pedir<Conversacion>(`/tenants/${id}/conversations/${conversacionId}/manual`, {
+    method: "POST",
+    headers: json,
+    body: JSON.stringify({ horas }),
+  });
+
+export const reanudarBot = (id: string, conversacionId: string) =>
+  pedir<Conversacion>(`/tenants/${id}/conversations/${conversacionId}/manual`, {
+    method: "DELETE",
+  });
+
 export const listarClaves = (id: string) => pedir<Clave[]>(`/tenants/${id}/keys`);
 
 export const emitirClave = (id: string, name: string, scopes: string[]) =>
