@@ -18,7 +18,7 @@ tiene su propio System Prompt y su propia base de conocimiento.
 ```
 apps/api/    Backend FastAPI (motor, RAG, canales)
 apps/web/    Landing de la agencia + dashboard de clientes
-infra/       docker-compose (Postgres+pgvector, Redis) y Dockerfiles
+infra/       docker-compose (Postgres+pgvector) y Dockerfiles
 docs/        Arquitectura y ADRs
 ```
 

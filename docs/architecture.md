@@ -256,9 +256,11 @@ Los tokens se acumulan aparte (`input`/`output`/`cache_read`) para facturar y
 medir. No frenan nada: cuotear y facturar son ejes distintos.
 
 > **Pendiente: rate limiting.** La cuota acota la perdida total, pero un loop
-> puede quemarla en una hora. Falta un limite por minuto, que necesita Redis
-> (ya esta en el compose, sin usar) y una decision de que hacer si Redis se cae:
-> fail-open deja pasar todo, fail-closed corta el servicio.
+> puede quemarla en una hora. Falta un limite por minuto. Con Redis es el camino
+> natural, y hay que decidir que pasa si Redis se cae: fail-open deja pasar todo,
+> fail-closed corta el servicio. Para el volumen actual tambien alcanza una
+> tabla de contadores en Postgres, que evita sumar una pieza de infraestructura
+> mas —y un modo de falla mas— antes de necesitarla.
 
 ## Garantias del webhook
 
@@ -302,8 +304,7 @@ un 401 no mejora por insistir. El SDK de Anthropic ya trae los suyos.
 > **Limite conocido:** `BackgroundTasks` vive en el proceso. Si el contenedor se
 > reinicia entre el 200 y el fin del procesamiento, ese mensaje queda en
 > `pending` para siempre. Es visible y reintentable a mano, pero cuando el
-> volumen lo justifique hay que mover esto a una cola real (Redis ya esta en el
-> compose para eso).
+> volumen lo justifique hay que mover esto a una cola real.
 
 ## Orden del prompt y prompt caching
 
