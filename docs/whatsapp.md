@@ -114,6 +114,40 @@ completo, con dos limitaciones:
   esa misma pantalla (hasta 5).
 - El token vence a las 24 h: sirve para probar, no para dejarlo andando.
 
+## Acompanar al cliente
+
+El cliente **no tiene donde entrar por su cuenta**: no hay registro ni portal.
+La unica puerta es el link que vos le generas y le mandas. Si no se lo mandas,
+no ve nada.
+
+### Lo que conviene decirle antes de mandarselo
+
+- Que tenga a mano el **telefono** donde va a recibir el codigo de Meta.
+- Que use un numero que **no este activo en la app comun de WhatsApp**. Si el
+  numero ya tiene WhatsApp normal o WhatsApp Business, primero hay que borrar
+  esa cuenta desde la app (Ajustes -> Cuenta -> Eliminar mi cuenta) o usar otro
+  numero. Es el motivo por el que mas se traba el alta.
+- Que necesita una **cuenta de Facebook**. No hace falta que tenga Business
+  Manager armado: el asistente se lo crea en el momento.
+- Que son 2-3 minutos y no cierre la ventana hasta el final.
+
+### Problemas comunes
+
+| Lo que dice el cliente | Que pasa | Que hacer |
+| --- | --- | --- |
+| "No me abre la ventana" | Bloqueador de ventanas emergentes o de publicidad | Que permita popups en el sitio y recargue. La pagina avisa sola si el bloqueador impidio cargar el conector. |
+| "Me dice que el numero ya esta en uso" | El numero tiene WhatsApp activo | Borrar la cuenta desde la app de WhatsApp, o usar otro numero. |
+| "Cerre la ventana sin querer" | El alta no se completo | Que vuelva a abrir el mismo link. No quedo nada a medias. |
+| "El link no anda / vencio" | Pasaron mas de 72 h | Genera otro desde el panel. |
+| "Ya esta conectado" | El alta ya se hizo | No hay nada que hacer. Verificalo en el panel. |
+| "Dice que quedo conectado pero con una advertencia" | Meta no acepto registrar el numero, casi siempre por verificacion en dos pasos previa | Lo resolves vos desde Meta: hay que desactivar el PIN viejo del numero. El resto del alta quedo bien. |
+
+### Como verificar que quedo bien
+
+En `/panel/{cliente}` -> WhatsApp tiene que decir **"Conectado — el bot responde
+por WhatsApp"**. La prueba de fuego es mandarle un mensaje al numero del cliente
+y ver que conteste.
+
 ## Tramites de Meta: el cuello de botella real
 
 El alta automatica funciona en modo desarrollo con cuentas agregadas como
