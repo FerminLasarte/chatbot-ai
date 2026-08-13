@@ -76,6 +76,21 @@ export default async function Onboarding({ params }: { params: Promise<{ token: 
         <li>No cierres la ventana hasta que termine.</li>
       </ul>
 
+      {/* Meta mira esta pantalla en la revision de la app, y ademas es lo justo:
+          antes de conectar su WhatsApp el cliente tiene que poder leer que
+          hacemos con los datos. */}
+      <p className="mt-5 text-xs text-zinc-500">
+        Al conectar acept&aacute;s nuestros{" "}
+        <a href="/terminos" className="underline">
+          t&eacute;rminos
+        </a>{" "}
+        y la{" "}
+        <a href="/privacidad" className="underline">
+          pol&iacute;tica de privacidad
+        </a>
+        .
+      </p>
+
       <BotonConectar
         token={token}
         appId={estado.app_id}
