@@ -31,7 +31,7 @@ ella.
 | App Secret | Configuracion de la App -> Basica -> "Clave secreta" | `WHATSAPP_APP_SECRET` |
 | Verify Token | Lo inventas vos | `WHATSAPP_VERIFY_TOKEN` |
 | App ID | Arriba de todo en el panel de la App | `WHATSAPP_APP_ID` |
-| Config ID | WhatsApp -> Configuracion -> Embedded Signup | `WHATSAPP_CONFIG_ID` |
+| Config ID | Facebook Login for Business -> Configurations (ver Paso 4) | `WHATSAPP_CONFIG_ID` |
 | URL del panel | La tuya | `ONBOARDING_BASE_URL` |
 
 El Verify Token ya esta generado y cargado en Railway. **Falta el App Secret**:
@@ -58,9 +58,31 @@ En WhatsApp -> Configuracion -> Webhooks:
 
 ## Paso 4 — Generar el Config ID del alta
 
-En **WhatsApp -> Configuracion -> Embedded Signup**, crea una configuracion.
-Ahi se define que permisos pide el popup y que pasos ve el cliente. Meta te
-devuelve un `config_id`: eso va en `WHATSAPP_CONFIG_ID`.
+★ **No esta bajo WhatsApp**, que es donde uno lo busca primero. Esta en el
+producto **Facebook Login for Business**:
+
+1. <https://developers.facebook.com/apps> -> elegi tu App.
+2. En la home del panel, buscar la tarjeta **Facebook Login for Business** y
+   darle **Set Up** (si nunca lo configuraste).
+3. Ir a **Configurations** -> **Create configuration**.
+   URL directa: `https://developers.facebook.com/apps/<APP_ID>/fb-login/configurations/`
+4. Login variation: **WhatsApp Embedded Signup**.
+5. Assets: **WhatsApp accounts**. Permisos: los minimos que necesites
+   (`whatsapp_business_management` y `whatsapp_business_messaging`). Meta avisa
+   que pedir permisos de mas hace que mas clientes abandonen el alta a la mitad.
+6. **Copia el Configuration ID**: eso va en `WHATSAPP_CONFIG_ID`.
+
+### ★ Ojo con el vencimiento del token
+
+Esta pantalla define **cuanto dura el token** que recibe nuestro backend, y
+Meta ofrece una plantilla lista llamada *"WhatsApp Embedded Signup
+Configuration With 60 Expiration Token"*.
+
+**Esa plantilla no sirve para este caso.** Con tokens de 60 dias, el bot de cada
+cliente deja de responder a los dos meses del alta: sin aviso, sin error visible
+y sin que el cliente entienda por que. Hay que elegir la opcion de token **sin
+vencimiento**. Si por algun motivo se usa una con vencimiento, hay que agregar
+un refresco periodico del token, que hoy el codigo no hace.
 
 No es codigo, es un dato de configuracion. Sin el, la pagina de onboarding
 responde 503 a proposito, para que el error lo veas vos y no el cliente frente

@@ -53,7 +53,7 @@ catalogo) en vez de la de Postgres a secas.
 | `WHATSAPP_VERIFY_TOKEN` | el que pusiste en Meta al registrar el webhook |
 | `WHATSAPP_APP_SECRET` | Meta -> Configuracion de la App -> Basica |
 | `WHATSAPP_APP_ID` | Meta -> panel de la App |
-| `WHATSAPP_CONFIG_ID` | Meta -> WhatsApp -> Configuracion -> Embedded Signup |
+| `WHATSAPP_CONFIG_ID` | Meta -> Facebook Login for Business -> Configurations |
 | `ONBOARDING_BASE_URL` | `https://TU-WEB.up.railway.app` — la URL del servicio Web, con https |
 
 `LLM_MODEL` y `EMBEDDINGS_MODEL` no hace falta setearlas: los defaults del

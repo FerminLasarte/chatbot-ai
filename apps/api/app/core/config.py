@@ -91,9 +91,15 @@ class Settings(BaseSettings):
     # sale del servidor, es whatsapp_app_secret, con el que se canjea el `code`
     # que devuelve el popup por el access token del cliente.
     #
-    # El config_id no se programa: se genera en el Meta App Dashboard
-    # (WhatsApp -> Configuracion -> Embedded Signup) y se pega aca. Define que
-    # permisos pide el popup y que pasos ve el cliente.
+    # El config_id no se programa: se genera en el Meta App Dashboard, en
+    # "Facebook Login for Business" -> Configurations (NO bajo WhatsApp, que es
+    # donde uno lo busca primero). Define que permisos pide el popup, que pasos
+    # ve el cliente y —importante— cuanto dura el token que recibimos.
+    #
+    # ★ La plantilla que ofrece Meta por defecto emite tokens de 60 dias. Con esa,
+    # el bot de cada cliente deja de responder a los dos meses del alta, sin aviso
+    # y sin error hasta que alguien escribe. La configuracion tiene que emitir
+    # token sin vencimiento, o hay que agregar un refresco periodico.
     whatsapp_app_id: str = ""
     whatsapp_config_id: str = ""
 
