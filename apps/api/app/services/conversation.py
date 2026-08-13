@@ -19,6 +19,7 @@ El contexto se recupera fresco para la pregunta actual, en cada turno.
 import logging
 import uuid
 from datetime import UTC, datetime, timedelta
+from typing import Literal
 
 from anthropic.types import MessageParam, TextBlockParam
 from sqlalchemy import func, select
@@ -215,7 +216,9 @@ async def _cargar_historia(db: AsyncSession, conversation_id: uuid.UUID) -> list
     # seguidas, no mantuvo tres intercambios.
     historia: list[MessageParam] = []
     for m in recientes:
-        rol = "user" if m.role == ROL_USUARIO else "assistant"
+        # El tipo explicito no es decorativo: MessageParam["role"] es un Literal,
+        # y sin la anotacion mypy infiere `str` y rechaza la construccion.
+        rol: Literal["user", "assistant"] = "user" if m.role == ROL_USUARIO else "assistant"
         anterior = historia[-1] if historia else None
         if anterior is not None and anterior["role"] == rol:
             bloques = anterior["content"]

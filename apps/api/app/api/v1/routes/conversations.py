@@ -138,7 +138,9 @@ async def list_conversations(
         .distinct(Message.conversation_id)
         .order_by(Message.conversation_id, Message.position.desc())
     )
-    ultimos = dict(ultimos_filas.all())
+    # .tuples() y no .all() a secas: devuelve tuplas tipadas en vez de Row, que
+    # es lo que permite que dict() conserve los tipos (uuid -> texto del mensaje).
+    ultimos = dict(ultimos_filas.tuples().all())
 
     return [_to_read(c, n, ultimos.get(c.id)) for c, n in conversaciones]
 
