@@ -52,10 +52,12 @@ class Settings(BaseSettings):
 
     # --- Memoria conversacional ---
     # Cuantos mensajes previos se replican en cada turno (usuario + asistente
-    # cuentan por separado, asi que 10 son ~5 intercambios).
-    # ESTA ES LA PALANCA DIRECTA DEL COSTO POR MENSAJE: cada turno vuelve a
-    # enviar toda esta historia como input.
-    conversation_history_messages: int = 10
+    # cuentan por separado, asi que 6 son ~3 intercambios).
+    # Cada turno vuelve a enviar toda esta historia como input, asi que baja el
+    # costo por mensaje —pero MENOS de lo que parece: medido con el constructor
+    # de prompts real, cada mensaje de historia pesa ~59 tokens contra los ~302
+    # que pesa un fragmento de RAG. La palanca fuerte es `retrieval_top_k`.
+    conversation_history_messages: int = 6
     # Inactividad tras la cual se abre una conversacion nueva. 24 h coincide con
     # la ventana de atencion al cliente de WhatsApp.
     conversation_idle_minutes: int = 1440
@@ -75,7 +77,14 @@ class Settings(BaseSettings):
     # --- RAG ---
     chunk_size: int = 800
     chunk_overlap: int = 120
-    retrieval_top_k: int = 5
+    # ★ EL MAYOR COMPONENTE DEL COSTO POR MENSAJE. Cada fragmento son ~302
+    # tokens de input (chunk_size 800 caracteres), y viajan en TODOS los turnos.
+    # Sacar uno ahorra lo mismo que sacar cinco mensajes de historia.
+    #
+    # El piso practico es 3: por debajo, la respuesta correcta empieza a quedar
+    # afuera del contexto y el bot contesta "no tengo esa informacion" teniendo
+    # el dato cargado. Antes de bajar de 4 conviene medirlo con evals/.
+    retrieval_top_k: int = 4
 
     # --- WhatsApp Cloud API (Meta) ---
     # Estos dos son de la App de Meta, no del cliente: se comparten entre todos
@@ -122,6 +131,11 @@ class Settings(BaseSettings):
     # OJO: si se pierde o se cambia, los tokens ya guardados no se pueden
     # descifrar y hay que volver a cargarlos.
     encryption_key: str = ""
+
+    # --- Reporte de errores ---
+    # Sin DSN no se manda nada a ningun lado (ver core/monitoreo.py). El plan
+    # gratuito de Sentry alcanza de sobra para este volumen.
+    sentry_dsn: str = ""
 
     # --- Seguridad del dashboard ---
     jwt_secret: str = JWT_SECRET_INSEGURO

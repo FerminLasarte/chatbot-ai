@@ -186,6 +186,26 @@ export const reanudarBot = (id: string, conversacionId: string) =>
     method: "DELETE",
   });
 
+export type Incidente = {
+  id: string;
+  tenant_id: string | null;
+  channel: string;
+  external_id: string;
+  /** "failed" (algo explotó) o "pending" (quedó colgado sin procesar). */
+  status: string;
+  attempts: number;
+  error: string | null;
+  /** Lo calcula la API, igual que en Conversacion: el panel no resta fechas. */
+  minutos: number;
+};
+
+/**
+ * Mensajes que no se llegaron a contestar. Sin `tenantId` trae los de todos los
+ * clientes, que es lo que necesita la lista para marcar cuál está roto.
+ */
+export const listarIncidentes = (tenantId?: string) =>
+  pedir<Incidente[]>(`/incidents${tenantId ? `?tenant_id=${tenantId}` : ""}`);
+
 export const listarClaves = (id: string) => pedir<Clave[]>(`/tenants/${id}/keys`);
 
 export const emitirClave = (id: string, name: string, scopes: string[]) =>

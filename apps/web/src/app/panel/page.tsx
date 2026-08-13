@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
-import { ErrorApi, listarClientes } from "@/lib/api";
+import { ErrorApi, listarClientes, listarIncidentes } from "@/lib/api";
 import { haySesion } from "@/lib/session";
 import { nuevoCliente, salir } from "./acciones";
 import { Boton, Formulario } from "./ui";
@@ -26,8 +26,31 @@ export default async function Panel() {
     );
   }
 
+  // Cuantos mensajes quedaron sin contestar, por cliente. Va aparte del try de
+  // arriba a proposito: que el monitoreo falle no puede dejarte sin panel.
+  const rotos = new Map<string, number>();
+  try {
+    for (const i of await listarIncidentes()) {
+      if (i.tenant_id) rotos.set(i.tenant_id, (rotos.get(i.tenant_id) ?? 0) + 1);
+    }
+  } catch {
+    /* si no se pueden leer, la lista se muestra igual */
+  }
+  const totalRotos = [...rotos.values()].reduce((a, b) => a + b, 0);
+
   return (
     <Marco>
+      {totalRotos > 0 && (
+        <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950 dark:text-red-300">
+          <strong>
+            {totalRotos} {totalRotos === 1 ? "mensaje quedo" : "mensajes quedaron"} sin
+            contestar
+          </strong>{" "}
+          en {rotos.size} {rotos.size === 1 ? "cliente" : "clientes"}. Entr&aacute; al cliente
+          marcado para ver el detalle.
+        </p>
+      )}
+
       <section className="rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
         {clientes.length === 0 ? (
           <p className="p-6 text-center text-sm text-zinc-500">
@@ -47,8 +70,15 @@ export default async function Panel() {
                     </span>
                     <span className="block text-xs text-zinc-500">{c.slug}</span>
                   </span>
-                  <span className="text-xs text-zinc-400">
-                    {c.is_active ? "activo" : "inactivo"} &rarr;
+                  <span className="flex items-center gap-3 text-xs text-zinc-400">
+                    {rotos.has(c.id) && (
+                      <span className="rounded-full bg-red-100 px-2 py-0.5 font-medium text-red-700 dark:bg-red-950 dark:text-red-300">
+                        {rotos.get(c.id)} sin contestar
+                      </span>
+                    )}
+                    <span>
+                      {c.is_active ? "activo" : "inactivo"} &rarr;
+                    </span>
                   </span>
                 </Link>
               </li>

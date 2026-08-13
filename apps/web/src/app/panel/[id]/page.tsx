@@ -6,6 +6,7 @@ import {
   listarClientes,
   listarConversaciones,
   listarDocumentos,
+  listarIncidentes,
   verUso,
   verWhatsApp,
 } from "@/lib/api";
@@ -36,13 +37,14 @@ export default async function Cliente({ params }: { params: Promise<{ id: string
 
   // Se piden en paralelo: son consultas independientes y en serie sumarian sus
   // latencias.
-  const [clientes, documentos, uso, claves, wa, conversaciones] = await Promise.all([
+  const [clientes, documentos, uso, claves, wa, conversaciones, incidentes] = await Promise.all([
     listarClientes(),
     listarDocumentos(id),
     verUso(id),
     listarClaves(id),
     verWhatsApp(id),
     listarConversaciones(id),
+    listarIncidentes(id),
   ]);
 
   const cliente = clientes.find((c) => c.id === id);
@@ -60,6 +62,41 @@ export default async function Cliente({ params }: { params: Promise<{ id: string
           </h1>
           <p className="text-sm text-zinc-500">{cliente.slug}</p>
         </header>
+
+        {/* --- Mensajes sin contestar ---
+            Va primero y solo aparece si hay algo: es lo unico de esta pagina
+            que significa que el cliente esta siendo mal atendido AHORA. */}
+        {incidentes.length > 0 && (
+          <Seccion
+            titulo="Mensajes sin contestar"
+            ayuda="Entraron pero el bot no llego a responderlos. 'fallado' es que algo exploto; 'colgado' es que se perdio en un reinicio del servidor. Al usuario final no le llego nada."
+          >
+            <ul className="flex flex-col gap-3">
+              {incidentes.map((i) => (
+                <li
+                  key={i.id}
+                  className="rounded-md border border-red-200 bg-red-50 p-3 text-sm dark:border-red-900 dark:bg-red-950"
+                >
+                  <div className="flex flex-wrap items-baseline justify-between gap-2">
+                    <span className="font-medium text-red-800 dark:text-red-300">
+                      {i.status === "failed" ? "Fallado" : "Colgado"}
+                      {i.channel === "whatsapp" ? " — WhatsApp" : ` — ${i.channel}`}
+                    </span>
+                    <span className="text-xs text-red-700 dark:text-red-400">
+                      hace {i.minutos < 60 ? `${i.minutos} min` : `${Math.round(i.minutos / 60)} h`}
+                      {i.attempts > 1 && ` · ${i.attempts} intentos`}
+                    </span>
+                  </div>
+                  {i.error && (
+                    <p className="mt-2 overflow-x-auto font-mono text-xs text-red-900 dark:text-red-300">
+                      {i.error}
+                    </p>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </Seccion>
+        )}
 
         {/* --- Comportamiento --- */}
         <Seccion

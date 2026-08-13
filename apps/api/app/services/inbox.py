@@ -2,8 +2,10 @@
 
 import logging
 import uuid
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import update
+from sqlalchemy import and_, or_, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -64,3 +66,73 @@ async def mark_failed(db: AsyncSession, event_id: uuid.UUID, error: str) -> None
         .values(status=EventStatus.FAILED.value, error=error[:2000])
     )
     await db.commit()
+
+
+# ---------------------------------------------------------------------------
+# Que se rompio
+#
+# La tabla venia guardando los fallos desde el principio -y hasta con un indice
+# por estado- pero nadie los leia nunca. Un cliente con el bot roto no se veia
+# desde ningun lado: habia que entrar a la base a buscarlo.
+# ---------------------------------------------------------------------------
+
+# Un mensaje que sigue `pending` despues de esto no se esta procesando: se
+# perdio. `BackgroundTasks` vive en el proceso, asi que un reinicio del
+# contenedor entre el 200 a Meta y el fin del procesamiento lo deja colgado
+# para siempre (ver docs/architecture.md). 15 minutos es varias veces lo que
+# tarda un mensaje normal, asi que no genera falsos positivos.
+MINUTOS_PARA_DAR_POR_COLGADO = 15
+
+
+@dataclass(frozen=True)
+class Incidente:
+    """Un mensaje entrante que no llego a contestarse."""
+
+    id: uuid.UUID
+    tenant_id: uuid.UUID | None
+    channel: str
+    external_id: str
+    status: str
+    attempts: int
+    error: str | None
+    # ★ Los minutos los calcula la API, no el panel. El panel se renderiza en el
+    # servidor (Railway, en UTC): si restara fechas por su cuenta mostraria
+    # antiguedades que no son las del usuario. Mismo criterio que Conversacion.
+    minutos: int
+
+
+async def incidentes(db: AsyncSession, tenant_id: uuid.UUID | None = None) -> list[Incidente]:
+    """Mensajes fallados, mas los que quedaron colgados en `pending`.
+
+    Sin `tenant_id` devuelve los de todos los clientes, que es lo que necesita
+    la lista del panel para marcar cual esta roto.
+    """
+    ahora = datetime.now(UTC)
+    corte = ahora - timedelta(minutes=MINUTOS_PARA_DAR_POR_COLGADO)
+
+    condiciones = or_(
+        ProcessedEvent.status == EventStatus.FAILED.value,
+        and_(
+            ProcessedEvent.status == EventStatus.PENDING.value,
+            ProcessedEvent.created_at < corte,
+        ),
+    )
+    stmt = select(ProcessedEvent).where(condiciones)
+    if tenant_id is not None:
+        stmt = stmt.where(ProcessedEvent.tenant_id == tenant_id)
+
+    filas = await db.scalars(stmt.order_by(ProcessedEvent.created_at.desc()).limit(200))
+
+    return [
+        Incidente(
+            id=f.id,
+            tenant_id=f.tenant_id,
+            channel=f.channel,
+            external_id=f.external_id,
+            status=f.status,
+            attempts=f.attempts,
+            error=f.error,
+            minutos=int((ahora - f.created_at).total_seconds() // 60),
+        )
+        for f in filas
+    ]

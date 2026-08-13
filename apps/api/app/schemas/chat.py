@@ -194,3 +194,21 @@ class OnboardingResultado(BaseModel):
     # Presente cuando el alta quedo usable pero hay algo que mirar (hoy: el
     # registro del numero). Se le muestra al cliente tal cual.
     advertencia: str | None = None
+
+
+class IncidentRead(BaseModel):
+    """Un mensaje entrante que no se llego a contestar.
+
+    Es lo que el panel muestra para que un bot roto se vea sin entrar a la base.
+    `minutos` lo calcula la API a proposito: ver la nota de ConversationRead.
+    """
+
+    id: str
+    tenant_id: str | None
+    channel: str
+    external_id: str
+    # "failed" (algo exploto) o "pending" (quedo colgado, ver inbox.py).
+    status: str
+    attempts: int
+    error: str | None
+    minutos: int

@@ -85,6 +85,13 @@ export default function Privacidad() {
         <li>
           <strong>Railway</strong> — donde corren el servidor y la base de datos.
         </li>
+        <li>
+          <strong>Sentry</strong> — nos avisa cuando algo falla. Est&aacute; configurado para{" "}
+          <strong>no</strong> recibir el contenido de las conversaciones: le llega el detalle
+          t&eacute;cnico del error y de qu&eacute; empresa se trata, no lo que escribiste. Un
+          mensaje de error puede igualmente arrastrar alg&uacute;n dato t&eacute;cnico, por eso lo
+          nombramos ac&aacute;.
+        </li>
       </ul>
       <p>
         Estos proveedores estan fuera de Argentina, asi que tus datos se procesan en el exterior.

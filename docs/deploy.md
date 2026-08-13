@@ -55,6 +55,7 @@ catalogo) en vez de la de Postgres a secas.
 | `WHATSAPP_APP_ID` | Meta -> panel de la App |
 | `WHATSAPP_CONFIG_ID` | Meta -> Facebook Login for Business -> Configurations |
 | `ONBOARDING_BASE_URL` | `https://TU-WEB.up.railway.app` — la URL del servicio Web, con https |
+| `SENTRY_DSN` | opcional — reporte de errores. Sin esto, un fallo en segundo plano no avisa a nadie |
 
 `LLM_MODEL` y `EMBEDDINGS_MODEL` no hace falta setearlas: los defaults del
 codigo (`claude-haiku-4-5` y `voyage-4`) son los que elegimos con el eval.
