@@ -4,17 +4,20 @@
 // lea los terminos, esperan que los tres documentos digan exactamente lo mismo.
 // Si estos datos viven en tres archivos, tarde o temprano dicen tres cosas.
 //
-// ⚠️ FALTA COMPLETAR: los campos marcados con TODO son los unicos que no pude
-// saber leyendo el codigo. Sin ellos los documentos no son validos como tales.
+// Se opera como persona fisica, no como sociedad: el titular es quien responde,
+// y por eso figura su nombre y no una razon social de empresa. Es valido —una
+// persona fisica con CUIT es parte legal suficiente para prestar el servicio—,
+// pero si algun dia se constituye una SRL o SA hay que cambiar los tres campos
+// de abajo y volver a desplegar. Nada mas depende de esto.
 export const EMPRESA = {
   nombreComercial: "Argencore",
-  // TODO: razon social completa, como figura en AFIP.
-  razonSocial: "TODO — razon social",
-  // TODO: CUIT.
-  cuit: "TODO — CUIT",
-  // TODO: domicilio legal. Meta lo pide para la verificacion de empresa, asi
-  // que conviene que coincida con el que cargues alli.
-  domicilio: "TODO — domicilio legal",
+  // Tiene que coincidir EXACTO con lo que figura en ARCA, incluidos los acentos:
+  // es el dato que Meta contrasta contra la documentacion en la verificacion.
+  razonSocial: "Fermin Lasarte",
+  cuit: "20-43448133-4",
+  // Tambien es el que va cargado en la verificacion de empresa de Meta: si los
+  // dos no coinciden, la verificacion se rechaza.
+  domicilio: "Brasil 219, Tandil, Provincia de Buenos Aires, Argentina",
   email: "argencoresolutions@gmail.com",
   // El servicio que prestamos, dicho igual en los tres documentos.
   servicio: "un asistente automatico que responde consultas por WhatsApp en nombre de empresas",
