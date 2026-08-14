@@ -13,11 +13,11 @@ export const EMPRESA = {
   nombreComercial: "Argencore",
   // Tiene que coincidir EXACTO con lo que figura en ARCA, incluidos los acentos:
   // es el dato que Meta contrasta contra la documentacion en la verificacion.
-  razonSocial: "Fermin Lasarte",
-  cuit: "20-43448133-4",
+  razonSocial: "Facundo Nazar Anchorena",
+  cuit: "20-43909145-3",
   // Tambien es el que va cargado en la verificacion de empresa de Meta: si los
   // dos no coinciden, la verificacion se rechaza.
-  domicilio: "Brasil 219, Tandil, Provincia de Buenos Aires, Argentina",
+  domicilio: "Saint Miqueu 1402, Tandil, Provincia de Buenos Aires, Argentina",
   email: "argencoresolutions@gmail.com",
   // El servicio que prestamos, dicho igual en los tres documentos.
   servicio: "un asistente automatico que responde consultas por WhatsApp en nombre de empresas",
@@ -25,4 +25,4 @@ export const EMPRESA = {
 
 // Fecha de ultima actualizacion de los tres documentos. Se cambia a mano cuando
 // se edita alguno: es un dato legal, no la fecha del build.
-export const ACTUALIZADO = "13 de agosto de 2026";
+export const ACTUALIZADO = "14 de agosto de 2026";
