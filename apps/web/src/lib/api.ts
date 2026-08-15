@@ -150,6 +150,19 @@ export type LinkOnboarding = { url: string; expira_at: string };
 export const generarLinkOnboarding = (id: string) =>
   pedir<LinkOnboarding>(`/tenants/${id}/onboarding-link`, { method: "POST" });
 
+export type LinkPortal = { url: string; key_prefix: string };
+
+/**
+ * Emite el link con el que el duenio del negocio ve SUS conversaciones y pausa
+ * SU bot, sin entrar al panel de la agencia.
+ *
+ * El link lleva una clave adentro y solo se ve una vez (la API guarda el hash).
+ * No vence: se revoca. Generar uno nuevo invalida el anterior, asi que este es
+ * tambien el boton para usar si un cliente dice que se le filtro el link.
+ */
+export const generarLinkPortal = (id: string) =>
+  pedir<LinkPortal>(`/tenants/${id}/portal-link`, { method: "POST" });
+
 export type Conversacion = {
   id: string;
   channel: string;

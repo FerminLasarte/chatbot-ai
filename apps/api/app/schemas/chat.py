@@ -196,6 +196,40 @@ class OnboardingResultado(BaseModel):
     advertencia: str | None = None
 
 
+# ---------------------------------------------------------------------------
+# Portal del cliente
+# ---------------------------------------------------------------------------
+
+
+class PortalLink(BaseModel):
+    """El link con el que el duenio del negocio entra a ver sus conversaciones.
+
+    `url` lleva la clave adentro y es la UNICA vez que se puede leer: de la
+    clave solo se guarda el hash. Si se pierde, se emite otra desde el panel.
+
+    No tiene `expira_at` a proposito, al reves que OnboardingLink: el
+    onboarding se hace una vez y se termina, esto es un acceso permanente que
+    el cliente guarda en favoritos. Lo que reemplaza al vencimiento es la
+    revocacion, que es inmediata y esta en el panel.
+    """
+
+    url: str
+    # La parte publica de la clave, para reconocer despues cual es en la lista
+    # de claves del panel y poder revocar la correcta.
+    key_prefix: str
+
+
+class PortalTenant(BaseModel):
+    """Lo minimo para encabezar el portal: de que negocio es esto.
+
+    Deliberadamente NO es TenantRead. Ese trae el system_prompt, el tope
+    mensual y el slug interno; nada de eso tiene por que salir hacia el
+    navegador del cliente final.
+    """
+
+    nombre: str
+
+
 class IncidentRead(BaseModel):
     """Un mensaje entrante que no se llego a contestar.
 

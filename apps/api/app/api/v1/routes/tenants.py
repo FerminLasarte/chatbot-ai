@@ -10,7 +10,7 @@ from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, File, HTTPException, UploadFile, status
-from sqlalchemy import func, select
+from sqlalchemy import any_, func, literal, select
 
 from app.ai.rag.extract import ExtraccionFallida, extract_text
 from app.ai.rag.ingest import ingest_document
@@ -27,6 +27,7 @@ from app.schemas.chat import (
     DocumentRead,
     LimitUpdate,
     OnboardingLink,
+    PortalLink,
     PromptUpdate,
     TenantCreate,
     TenantRead,
@@ -285,6 +286,56 @@ async def emitir_link_de_onboarding(
     tenant = await _tenant_o_404(db, tenant_id)
     link = onboarding.emitir(tenant.id)
     return OnboardingLink(url=link.url, expira_at=link.expira_at)
+
+
+@router.post("/{tenant_id}/portal-link", response_model=PortalLink)
+async def emitir_link_de_portal(tenant_id: uuid.UUID, db: DbSession, _: AdminKey) -> PortalLink:
+    """Genera el link con el que el duenio del negocio ve sus conversaciones.
+
+    Es una API key comun con scope `client_portal` metida en una URL, no un
+    mecanismo de autenticacion nuevo: asi el link se revoca desde la misma lista
+    de claves del panel, se le ve el `last_used_at`, y el aislamiento entre
+    clientes lo sigue dando `CurrentTenant` (ver routes/portal.py).
+
+    ★ EMITIR UNO REVOCA EL ANTERIOR. Es lo que convierte a este boton en el
+    remedio cuando un link se filtra: la agencia aprieta "generar otro" y el que
+    ande dando vueltas por ahi deja de servir en el acto. El costo es que hay
+    que mandarle el nuevo al cliente; el alternativo -acumular links vivos que
+    nadie recuerda haber emitido- es peor.
+    """
+    tenant = await _tenant_o_404(db, tenant_id)
+
+    ahora = datetime.now(UTC)
+    # literal(...) == any_(columna) y no columna.any(...): con `Mapped[list[str]]`
+    # el segundo resuelve al .any() de las relaciones y no tipa. Esto genera el
+    # mismo `'client_portal' = ANY(scopes)` que ya usa el CheckConstraint del modelo.
+    anteriores = await db.scalars(
+        select(ApiKey).where(
+            ApiKey.tenant_id == tenant.id,
+            ApiKey.revoked_at.is_(None),
+            literal(Scope.CLIENT_PORTAL.value) == any_(ApiKey.scopes),
+        )
+    )
+    for vieja in anteriores:
+        vieja.revoked_at = ahora
+
+    raw, prefix, hashed = generate_api_key()
+    db.add(
+        ApiKey(
+            name="portal del cliente",
+            key_prefix=prefix,
+            key_hash=hashed,
+            tenant_id=tenant.id,
+            scopes=[Scope.CLIENT_PORTAL.value],
+        )
+    )
+    await db.commit()
+
+    # Misma base que el link de onboarding: es el frontend, y en produccion ya
+    # esta validada como https (ver core/config.py). Sobre http la clave viajaria
+    # en claro en la URL.
+    base = settings.onboarding_base_url.rstrip("/")
+    return PortalLink(url=f"{base}/mi-negocio/{raw}", key_prefix=prefix)
 
 
 @router.patch("/{tenant_id}/prompt", response_model=TenantRead)

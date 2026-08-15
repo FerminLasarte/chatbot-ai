@@ -173,6 +173,22 @@ export async function generarLinkOnboarding(_estado: Estado, form: FormData): Pr
   }
 }
 
+export async function generarLinkPortal(_estado: Estado, form: FormData): Promise<Estado> {
+  await exigirSesion();
+  const id = String(form.get("id") ?? "");
+
+  try {
+    const link = await api.generarLinkPortal(id);
+    revalidatePath(`/panel/${id}`); // la clave nueva y la revocada salen en la lista
+    return {
+      link: link.url,
+      ok: "Mandaselo al cliente. No vence, y este link reemplaza al anterior si ya le habias dado uno.",
+    };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "no se pudo generar el link" };
+  }
+}
+
 export async function borrarTokenWhatsApp(_estado: Estado, form: FormData): Promise<Estado> {
   await exigirSesion();
   const id = String(form.get("id") ?? "");

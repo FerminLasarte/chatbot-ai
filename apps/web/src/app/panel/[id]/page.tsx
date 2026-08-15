@@ -17,6 +17,7 @@ import {
   borrarTokenWhatsApp,
   emitirClave,
   generarLinkOnboarding,
+  generarLinkPortal,
   guardarLimite,
   guardarPrompt,
   guardarWhatsApp,
@@ -25,8 +26,9 @@ import {
   revocarClave,
   subirDocumento,
 } from "../acciones";
-import { Boton, Formulario, FormularioClave, FormularioLinkOnboarding } from "../ui";
+import { Boton, Formulario, FormularioClave, FormularioLink } from "../ui";
 import { claseInput } from "@/lib/estilos";
+import { duracion } from "@/lib/duracion";
 
 export const metadata = { title: "Panel — cliente" };
 
@@ -49,6 +51,11 @@ export default async function Cliente({ params }: { params: Promise<{ id: string
 
   const cliente = clientes.find((c) => c.id === id);
   if (!cliente) notFound();
+
+  // El link del portal ES una clave con scope client_portal, asi que el estado
+  // se lee de la misma lista que ya se muestra mas abajo: no hace falta un
+  // endpoint aparte para saber si el cliente tiene acceso.
+  const tienePortal = claves.some((k) => k.is_active && k.scopes.includes("client_portal"));
 
   return (
     <div className="flex-1 bg-zinc-50 px-4 py-10 dark:bg-black">
@@ -183,10 +190,12 @@ export default async function Cliente({ params }: { params: Promise<{ id: string
             )}
           </p>
 
-          <FormularioLinkOnboarding
+          <FormularioLink
             accion={generarLinkOnboarding}
             tenantId={id}
-            yaConectado={wa.configurado}
+            etiqueta="Generar link para el cliente"
+            etiquetaRepetir="Generar otro link"
+            variante={wa.configurado ? "suave" : "normal"}
           />
 
           {/* La carga a mano sigue existiendo, pero plegada: es la salida de
@@ -250,6 +259,35 @@ export default async function Cliente({ params }: { params: Promise<{ id: string
               ))}
             </ul>
           )}
+        </Seccion>
+
+        {/* --- Acceso del cliente ---
+            Va pegado a Conversaciones porque es lo mismo que ve el cliente:
+            esta seccion es "darle a el la pantalla de arriba". */}
+        <Seccion
+          titulo="Acceso del cliente"
+          ayuda="Un link para que el duenio del negocio vea sus conversaciones y pause el bot el mismo, sin pedirtelo. No ve nada mas: ni documentos, ni credenciales, ni consumo, ni otros clientes."
+        >
+          <p className="mb-3 text-sm">
+            {tienePortal ? (
+              <span className="text-green-700 dark:text-green-400">
+                Tiene un link activo. Si lo perdi&oacute; o se le filtr&oacute;, gener&aacute; otro:
+                el anterior deja de funcionar en el acto.
+              </span>
+            ) : (
+              <span className="text-zinc-500">
+                Todav&iacute;a no tiene acceso propio.
+              </span>
+            )}
+          </p>
+
+          <FormularioLink
+            accion={generarLinkPortal}
+            tenantId={id}
+            etiqueta="Generar link de acceso"
+            etiquetaRepetir="Generar otro link"
+            variante={tienePortal ? "suave" : "normal"}
+          />
         </Seccion>
 
         {/* --- Consumo --- */}
@@ -366,23 +404,6 @@ function Hilo({ conversacion, tenantId }: { conversacion: Conversacion; tenantId
       )}
     </li>
   );
-}
-
-/**
- * Minutos -> texto corto ("40 min", "2 h 15 min", "3 d").
- *
- * Solo formatea: los minutos vienen calculados de la API. Ver el comentario de
- * `Conversacion` en lib/api.ts para por que el reloj esta de aquel lado.
- */
-function duracion(minutos: number): string {
-  if (minutos < 60) return `${minutos} min`;
-
-  const horas = Math.floor(minutos / 60);
-  if (horas < 24) {
-    const resto = minutos % 60;
-    return resto === 0 ? `${horas} h` : `${horas} h ${resto} min`;
-  }
-  return `${Math.floor(horas / 24)} d`;
 }
 
 function Seccion({

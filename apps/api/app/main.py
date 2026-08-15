@@ -14,6 +14,7 @@ from app.api.v1.routes import (
     incidents,
     knowledge,
     onboarding,
+    portal,
     tenants,
     webhooks,
 )
@@ -100,6 +101,9 @@ app.include_router(incidents.router, prefix="/api/v1")
 app.include_router(webhooks.router, prefix="/api/v1")
 # Sin API key: se autentica con el token firmado de la URL (ver el modulo).
 app.include_router(onboarding.router, prefix="/api/v1")
+# Lo usa el duenio del negocio, no la agencia: el tenant sale de la clave y
+# nunca de la URL (ver el modulo).
+app.include_router(portal.router, prefix="/api/v1")
 
 
 @app.get("/health", tags=["meta"])

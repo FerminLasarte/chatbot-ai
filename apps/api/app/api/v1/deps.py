@@ -125,3 +125,11 @@ CurrentTenant = Annotated[Tenant, Depends(get_current_tenant)]
 AdminKey = Annotated[ApiKey, Depends(require_scopes(Scope.ADMIN))]
 TenantKey = Annotated[ApiKey, Depends(require_scopes(Scope.TENANT))]
 ChatKey = Annotated[ApiKey, Depends(require_scopes(Scope.TENANT, Scope.CHAT))]
+
+# ★ `client_portal` va SOLO, sin acompaniarse de TENANT como hace ChatKey.
+# Combinar scopes en un require_scopes es un "o": una clave de portal filtrada
+# no puede terminar habilitada para endpoints de configuracion porque alguien
+# agrego Scope.TENANT a esta linea por comodidad. Y al reves tambien importa:
+# una clave `tenant` NO abre el portal, asi que el portal no le sirve a nadie
+# como atajo para entrar con la credencial del dashboard.
+PortalKey = Annotated[ApiKey, Depends(require_scopes(Scope.CLIENT_PORTAL))]
