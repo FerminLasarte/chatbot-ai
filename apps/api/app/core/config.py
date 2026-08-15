@@ -121,8 +121,13 @@ class Settings(BaseSettings):
     # cliente: solo permite conectarle un WhatsApp (ver services/onboarding.py).
     onboarding_link_ttl_hours: int = 72
 
-    # Base sobre la que se arma el link que se le pasa al cliente. Es el frontend,
-    # no la API: la pagina de onboarding vive en el panel (apps/web).
+    # Base sobre la que se arman los links que se le pasan al cliente final. Es
+    # el frontend, no la API: esas paginas viven en apps/web.
+    #
+    # La usan los dos links que existen hoy —el de onboarding (/onboarding/...)
+    # y el del portal del cliente (/mi-negocio/...)—. Conserva el nombre viejo
+    # porque ya esta cargada asi en el hosting; renombrarla obliga a tocar las
+    # variables de entorno de produccion sin ganar nada.
     onboarding_base_url: str = "http://localhost:3000"
 
     # --- Cifrado de credenciales de terceros ---
@@ -184,9 +189,10 @@ class Settings(BaseSettings):
             problemas.append("CORS_ORIGINS con '*'")
         if any(o.startswith("http://") for o in self.cors_origins):
             problemas.append("CORS_ORIGINS con http:// (tiene que ser https)")
-        # El link de onboarding lleva el token en la URL y se manda por WhatsApp
-        # o mail. Sobre http viaja en claro y cualquiera en el camino podria
-        # conectarle un WhatsApp al cliente.
+        # Los links al cliente llevan la credencial en la URL y se mandan por
+        # WhatsApp o mail. Sobre http viajan en claro: cualquiera en el camino
+        # podria conectarle un WhatsApp al cliente (link de onboarding) o
+        # quedarse con la clave de su portal (link de /mi-negocio).
         if self.onboarding_base_url.startswith("http://"):
             problemas.append("ONBOARDING_BASE_URL con http:// (tiene que ser https)")
 

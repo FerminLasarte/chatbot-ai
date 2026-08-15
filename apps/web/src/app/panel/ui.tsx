@@ -110,20 +110,29 @@ export function FormularioClave({
 }
 
 /**
- * Genera el link de onboarding y lo deja listo para copiar y pegar.
+ * Genera un link para mandarle al cliente y lo deja listo para copiar y pegar.
+ *
+ * Lo usan los dos links que existen: el de onboarding (conectar WhatsApp) y el
+ * del portal (ver conversaciones y pausar el bot). Comparten componente porque
+ * comparten el problema: el secreto se muestra UNA sola vez, asi que la pagina
+ * tiene que dejarlo copiar bien antes de que el usuario navegue a otro lado.
  *
  * Componente propio y no un `Formulario` porque el link hay que mostrarlo y
  * copiarlo, y eso necesita estado en el cliente (ver la nota de `Formulario`
  * sobre por que esto no se puede resolver con un render-prop).
  */
-export function FormularioLinkOnboarding({
+export function FormularioLink({
   accion,
   tenantId,
-  yaConectado,
+  etiqueta,
+  etiquetaRepetir,
+  variante = "normal",
 }: {
   accion: (estado: Estado, form: FormData) => Promise<Estado>;
   tenantId: string;
-  yaConectado: boolean;
+  etiqueta: string;
+  etiquetaRepetir: string;
+  variante?: "normal" | "suave";
 }) {
   const [estado, ejecutar] = useActionState(accion, VACIO);
   const [copiado, setCopiado] = useState(false);
@@ -143,9 +152,7 @@ export function FormularioLinkOnboarding({
     <form action={ejecutar} className="flex flex-col gap-3">
       <input type="hidden" name="id" value={tenantId} />
       <div>
-        <Boton variante={yaConectado ? "suave" : "normal"}>
-          {estado.link ? "Generar otro link" : "Generar link para el cliente"}
-        </Boton>
+        <Boton variante={variante}>{estado.link ? etiquetaRepetir : etiqueta}</Boton>
       </div>
 
       {estado.link && (
