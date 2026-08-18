@@ -31,7 +31,21 @@ def _detalle(exc: httpx.HTTPStatusError) -> str:
     return f"{exc.response.status_code}: {exc.response.text[:500]}"
 
 
-async def send_text(to: str, text: str, phone_number_id: str, access_token: str) -> None:
+def _id_del_mensaje(resp: httpx.Response) -> str | None:
+    """El wamid del mensaje recien enviado, si Meta lo devolvio.
+
+    Nunca levanta: el mensaje YA se entrego cuando esto corre. Quedarse sin el
+    id degrada un filtro (ver send_text), pero romper aca haria fallar un envio
+    exitoso y lo mandaria de nuevo en el reintento.
+    """
+    try:
+        return str(resp.json()["messages"][0]["id"])
+    except Exception:  # noqa: BLE001 — cualquier forma inesperada vale como "no vino"
+        logger.warning("Meta acepto el envio pero no devolvio el id del mensaje")
+        return None
+
+
+async def send_text(to: str, text: str, phone_number_id: str, access_token: str) -> str | None:
     """Envia un mensaje de texto en nombre del numero indicado.
 
     El access_token es POR CLIENTE y llega descifrado desde `tenants` (ver
@@ -40,6 +54,11 @@ async def send_text(to: str, text: str, phone_number_id: str, access_token: str)
 
     Levanta excepcion si no se pudo entregar: quien llama necesita saberlo para
     no marcar el mensaje como procesado con exito.
+
+    Devuelve el id (wamid) que Meta le asigno al mensaje, o None si no vino.
+    ★ No es decorativo: con coexistence, ese id es lo que permite reconocer el
+    echo de nuestro propio envio y no confundirlo con una respuesta escrita a
+    mano (ver docs/coexistence.md). El envio no falla por no tener el id.
     """
     if not access_token:
         raise WhatsAppSinCredencial(
@@ -54,7 +73,7 @@ async def send_text(to: str, text: str, phone_number_id: str, access_token: str)
         "text": {"body": text},
     }
 
-    async def _call() -> None:
+    async def _call() -> str | None:
         async with httpx.AsyncClient(timeout=20) as client:
             resp = await client.post(
                 url,
@@ -63,9 +82,10 @@ async def send_text(to: str, text: str, phone_number_id: str, access_token: str)
                 headers={"Authorization": f"Bearer {access_token}"},
             )
             resp.raise_for_status()
+            return _id_del_mensaje(resp)
 
     try:
-        await with_retry(_call, descripcion="envio a WhatsApp")
+        return await with_retry(_call, descripcion="envio a WhatsApp")
     except httpx.HTTPStatusError as exc:
         # 4xx no reintentable: numero invalido, ventana de 24h cerrada, token vencido.
         raise WhatsAppSendError(
