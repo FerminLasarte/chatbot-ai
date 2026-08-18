@@ -28,6 +28,8 @@ from app.api.v1.deps import DbSession
 from app.channels.whatsapp.client import send_text
 from app.channels.whatsapp.parser import (
     CAMPO_ECHOES,
+    CAMPO_MENSAJES,
+    CAMPOS_CONOCIDOS_SIN_USO,
     CANAL_ECHO,
     campo_del_evento,
     parse_echo,
@@ -85,14 +87,29 @@ async def receive(
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "firma invalida")
 
     payload = await request.json()
+    campo = campo_del_evento(payload)
 
     # Coexistence: el comercio contesto a mano desde el celular. Es un evento
     # de otra naturaleza -sale del negocio, no entra- y tiene su propio camino.
-    if campo_del_evento(payload) == CAMPO_ECHOES:
+    if campo == CAMPO_ECHOES:
         return await _recibir_echo(payload, db, background)
 
     incoming = parse_incoming(payload)
     if incoming is None:
+        # ★ Un campo desconocido se nombra en el log. `parse_incoming` descarta
+        # todo lo que no sea `messages`, asi que si Meta alguna vez manda los
+        # mensajes bajo otro nombre, el bot dejaria de contestar SIN ningun
+        # error: solo silencio, que es el fallo mas caro de diagnosticar de
+        # este modulo. Con esto, la causa esta a un grep de distancia.
+        #
+        # No entra por aca lo normal: los statuses de entrega y las reacciones
+        # vienen con field=`messages` y caen en la rama de abajo, calladas.
+        if campo is not None and campo != CAMPO_MENSAJES and campo not in CAMPOS_CONOCIDOS_SIN_USO:
+            logger.warning(
+                "webhook de Meta con un campo que no se maneja: %s "
+                "(si los mensajes dejaron de llegar, empeza por aca)",
+                campo,
+            )
         return {"status": "ignored"}  # status de entrega, reaccion, etc.
 
     tenant = await _tenant_por_numero(db, incoming.phone_number_id)
