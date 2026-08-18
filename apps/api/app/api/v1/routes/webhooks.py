@@ -29,6 +29,7 @@ from app.channels.whatsapp.client import send_text
 from app.channels.whatsapp.parser import (
     CAMPO_ECHOES,
     CAMPO_MENSAJES,
+    CAMPOS_CONOCIDOS_SIN_USO,
     CANAL_ECHO,
     campo_del_evento,
     parse_echo,
@@ -103,7 +104,7 @@ async def receive(
         #
         # No entra por aca lo normal: los statuses de entrega y las reacciones
         # vienen con field=`messages` y caen en la rama de abajo, calladas.
-        if campo is not None and campo != CAMPO_MENSAJES:
+        if campo is not None and campo != CAMPO_MENSAJES and campo not in CAMPOS_CONOCIDOS_SIN_USO:
             logger.warning(
                 "webhook de Meta con un campo que no se maneja: %s "
                 "(si los mensajes dejaron de llegar, empeza por aca)",

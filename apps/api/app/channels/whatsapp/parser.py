@@ -20,6 +20,14 @@ CANAL_ECHO = "whatsapp_echo"
 CAMPO_MENSAJES = "messages"
 CAMPO_ECHOES = "smb_message_echoes"
 
+# Los otros dos campos que Meta pide suscribir para coexistence. No se usan:
+# `history` es el backfill de hasta 180 dias de chats previos y
+# `smb_app_state_sync` son los contactos de la app. Estan nombrados para que el
+# webhook los ignore CALLADO: si cayeran en el aviso de "campo desconocido",
+# el backfill inicial llenaria el log de warnings justo cuando hace falta
+# leerlo limpio para confirmar los echoes.
+CAMPOS_CONOCIDOS_SIN_USO = frozenset({"history", "smb_app_state_sync"})
+
 
 def campo_del_evento(payload: dict) -> str | None:
     """Que clase de evento manda Meta (`messages`, `smb_message_echoes`, ...).

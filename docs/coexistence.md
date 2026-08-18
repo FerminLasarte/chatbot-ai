@@ -1,8 +1,25 @@
 # Coexistence: el comercio contesta a mano y el bot sigue andando
 
 Estado: **codigo implementado y apagado por defecto** (`COEXISTENCE_ENABLED=false`).
-Falta la configuracion del lado de Meta y confirmar el payload real contra un
-numero de prueba. Lo que queda por hacer esta al final, en "Como prenderlo".
+Falta la configuracion del lado de Meta. Lo que queda por hacer esta al final,
+en "Como prenderlo".
+
+Tres de las dudas que bloqueaban esto quedaron resueltas contra la
+documentacion oficial de Meta (consultada el 2026-08-18, ver Fuentes):
+
+- **La forma del payload de `smb_message_echoes` esta confirmada** y coincide
+  con lo que implementa el parser: lista `message_echoes`, con `from` / `to` /
+  `id` / `timestamp` / `type` y el contenido bajo la clave del tipo.
+- **La Cloud API NO genera echoes.** Los dispara la app del celular y los
+  dispositivos companion, no nuestros envios. La trampa de la auto-pausa no se
+  puede dar por ese camino; las dos defensas quedan igual, como seguro barato.
+- **No hace falta un `config_id` propio.** Coexistence se activa solo cuando la
+  cuenta cumple los requisitos de partner: la pantalla de seleccion de WABA
+  pasa a ofrecer conectar una cuenta de WhatsApp Business existente.
+
+★ REQUISITO NUEVO, y es el que puede frenar todo: Meta pide ser **Solution
+Partner o Tech Provider**. No es un toggle, es un estado de la cuenta. Si no lo
+somos, no importa cuan elegible sea el numero.
 
 ## Que problema resuelve
 
@@ -119,7 +136,7 @@ Estan las dos porque no sabemos todavia si el caso existe:
 ids separado del entrante. La duda de si podian colisionar queda resuelta por
 construccion.
 
-Tests: `apps/api/tests/test_coexistence.py` (25 casos).
+Tests: `apps/api/tests/test_coexistence.py` (32 casos).
 
 ## Lo que falta
 
@@ -129,26 +146,30 @@ Crear/ajustar la configuracion de Embedded Signup para onboarding de usuarios de
 la app de WhatsApp Business, y suscribir el WABA a `smb_message_echoes` (y
 `smb_app_state_sync` / `history` si se decide usarlos).
 
-★ DUDA ABIERTA: no esta confirmado si coexistence necesita un `config_id`
-distinto del actual (`settings.whatsapp_config_id`, uno solo hoy). Si necesita
-uno propio, hay que decidir si se reemplaza o si el onboarding soporta los dos
-caminos (numero nuevo -> flujo actual; numero que ya usa la app -> coexistence).
-Esto cambia el alcance del punto 3.
+Los tres campos: `smb_message_echoes` (el unico que usa el codigo), mas
+`history` y `smb_app_state_sync`. Estos dos ultimos el webhook los ignora
+callado a proposito (`CAMPOS_CONOCIDOS_SIN_USO`): el backfill de `history` son
+hasta 180 dias de chats, y avisar por cada uno dejaria el log inservible justo
+durante el alta.
 
-### 2. Confirmar el payload real
+RESUELTO: no hace falta un `config_id` propio. Sirve el que ya esta en
+`settings.whatsapp_config_id`.
 
-Es lo unico que bloquea el prendido. Activar coexistence en un numero de prueba,
-mandar un mensaje a mano desde el celular y buscar en el log de Railway:
+### 2. Confirmar el payload contra un evento real
+
+La forma ya esta confirmada contra la documentacion (arriba), asi que esto pasa
+de ser un bloqueante a ser una verificacion. Mandar un mensaje a mano desde el
+celular y buscar en el log de Railway:
 
     echo de coexistence recibido con la funcion apagada: {...}
 
 Comparar ese JSON con `_payload_echo` en `tests/test_coexistence.py`, que es la
 hipotesis que implementa el parser. Si difiere, corregir los dos.
 
-En la misma prueba se responde la otra duda: mandar un mensaje CON el bot (que
-conteste solo) y ver si aparece un segundo log de echo con ese mismo mensaje.
-Si aparece, Meta hace echo de los envios por Cloud API y las dos defensas de
-arriba pasan de ser un seguro a ser el mecanismo principal.
+En la misma prueba conviene confirmar lo que dice la documentacion sobre la
+Cloud API: mandar un mensaje CON el bot y verificar que NO aparece un segundo
+log de echo con esa respuesta. Si apareciera, la documentacion estaria
+desactualizada y las dos defensas pasarian de seguro a mecanismo principal.
 
 ### 3. Onboarding (`apps/web/src/app/onboarding/` + `apps/api/.../onboarding`)
 
@@ -174,7 +195,8 @@ Para apagarlo, la variable vuelve a `false` y el bot ignora los echoes al toque.
 
 ## Dudas que quedan abiertas
 
-1. Si coexistence necesita su propio `config_id` en el Meta App Dashboard.
+1. Si somos -o podemos ser- Solution Partner o Tech Provider. Es el requisito
+   que puede frenar todo el plan, y no depende del codigo.
 2. Si los tenants ya dados de alta con el Embedded Signup estandar pueden sumar
    coexistence sobre el mismo numero, o si hay que re-onboardearlos.
 3. Si Meta cuenta la antiguedad desde el uso del WhatsApp comun o desde la

@@ -294,6 +294,30 @@ async def test_un_campo_desconocido_se_nombra_en_el_log(
     assert "mensajes_pero_con_otro_nombre" in caplog.text
 
 
+@pytest.mark.parametrize("campo", ["history", "smb_app_state_sync"])
+async def test_los_campos_de_coexistence_sin_uso_se_ignoran_callados(
+    db: AsyncSession,
+    cliente: AsyncClient,
+    campo: str,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Meta pide suscribir tres campos; el codigo solo usa uno.
+
+    `history` es el backfill de hasta 180 dias de chats previos: si avisara por
+    cada uno, el log quedaria inservible justo durante el alta, que es cuando
+    hay que leerlo para confirmar los echoes.
+    """
+    payload = _payload_entrante("hola", wamid="wamid.otro")
+    payload["entry"][0]["changes"][0]["field"] = campo
+
+    with caplog.at_level("WARNING"):
+        r = await _postear(cliente, payload, monkeypatch)
+
+    assert r.json() == {"status": "ignored"}
+    assert "no se maneja" not in caplog.text
+
+
 async def test_un_status_de_entrega_no_ensucia_el_log(
     db: AsyncSession,
     cliente: AsyncClient,
