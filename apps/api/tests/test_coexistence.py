@@ -18,18 +18,25 @@ Lo que se defiende aca, en orden de que tan caro es equivocarse:
    Es el estado con el que esto se mergea (ver docs/coexistence.md).
 """
 
+import hashlib
+import hmac
+import json
 import uuid
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime, timedelta
 
+import httpx
 import pytest
 import pytest_asyncio
+from httpx import ASGITransport, AsyncClient
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.routes import webhooks
 from app.channels.whatsapp.parser import CANAL_ECHO, parse_echo, parse_incoming
 from app.core import cifrado as cifrado_mod
+from app.core import security as seguridad
+from app.main import app
 from app.models.event import EventStatus, ProcessedEvent
 from app.models.tenant import Conversation, Message, Tenant
 from app.services import inbox, whatsapp
@@ -136,11 +143,40 @@ async def tenant(db: AsyncSession, monkeypatch: pytest.MonkeyPatch) -> AsyncIter
 
 
 @pytest_asyncio.fixture
+async def cliente() -> AsyncIterator[AsyncClient]:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        yield ac
+
+
+@pytest_asyncio.fixture
 async def wamid(db: AsyncSession) -> AsyncIterator[str]:
     valor = f"wamid.echo.{uuid.uuid4().hex}"
     yield valor
     await db.execute(delete(ProcessedEvent).where(ProcessedEvent.external_id == valor))
     await db.commit()
+
+
+async def _postear(
+    cliente: AsyncClient, payload: dict, monkeypatch: pytest.MonkeyPatch
+) -> httpx.Response:
+    """POST al webhook real, firmado como lo firma Meta.
+
+    La firma va sobre los BYTES exactos que se mandan, no sobre el JSON
+    re-serializado: por eso el body se arma una sola vez y se manda como
+    `content`.
+    """
+    secreto = "secreto-de-prueba"
+    monkeypatch.setattr(seguridad.settings, "whatsapp_app_secret", secreto)
+    crudo = json.dumps(payload).encode()
+    firma = hmac.new(secreto.encode(), crudo, hashlib.sha256).hexdigest()
+    return await cliente.post(
+        "/api/v1/webhooks/whatsapp",
+        content=crudo,
+        headers={
+            "X-Hub-Signature-256": f"sha256={firma}",
+            "Content-Type": "application/json",
+        },
+    )
 
 
 async def _conversacion(db: AsyncSession, tenant: Tenant) -> Conversation:
@@ -185,6 +221,98 @@ def test_un_payload_sin_campo_sigue_entrando_como_mensaje() -> None:
     entrante = parse_incoming(payload)
     assert entrante is not None
     assert entrante.text == "hola"
+
+
+async def test_un_mensaje_entrante_real_sigue_entrando(
+    db: AsyncSession, tenant: Tenant, cliente: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """★ La regresion que hay que descartar antes de prender coexistence.
+
+    `parse_incoming` paso a filtrar por el nombre del campo, y esta en la ruta
+    caliente de TODOS los mensajes. Si ese filtro estuviera mal, el bot dejaria
+    de contestarle a todo el mundo. Este test entra por el endpoint de verdad
+    -firma incluida- con un payload con la forma que manda Meta.
+    """
+    encolados: list = []
+
+    async def falso_handle(*args: object) -> None:
+        encolados.append(args)
+
+    monkeypatch.setattr(webhooks, "_handle", falso_handle)
+
+    wamid_entrante = f"wamid.in.{uuid.uuid4().hex}"
+    try:
+        r = await _postear(
+            cliente, _payload_entrante("que horario tienen?", wamid=wamid_entrante), monkeypatch
+        )
+
+        assert r.json() == {"status": "accepted"}, "el bot dejo de recibir mensajes"
+        assert len(encolados) == 1
+        _event_id, tenant_id, from_number, texto, phone_number_id = encolados[0]
+        assert tenant_id == tenant.id
+        assert from_number == CLIENTE_FINAL
+        assert texto == "que horario tienen?"
+        assert phone_number_id == PHONE_NUMBER_ID
+    finally:
+        await db.execute(delete(ProcessedEvent).where(ProcessedEvent.external_id == wamid_entrante))
+        await db.commit()
+
+
+async def test_una_firma_invalida_no_entra(
+    cliente: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Cualquiera puede postear a esa URL: sin firma valida, nada pasa."""
+    monkeypatch.setattr(seguridad.settings, "whatsapp_app_secret", "secreto-de-prueba")
+    r = await cliente.post(
+        "/api/v1/webhooks/whatsapp",
+        json=_payload_entrante("hola", wamid="wamid.falso"),
+        headers={"X-Hub-Signature-256": "sha256=0000"},
+    )
+    assert r.status_code == 401
+
+
+async def test_un_campo_desconocido_se_nombra_en_el_log(
+    db: AsyncSession,
+    cliente: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """★ El unico modo de fallar de `parse_incoming` es el silencio.
+
+    Descarta todo lo que no sea el campo `messages`. Si Meta mandara los
+    mensajes bajo otro nombre, el bot dejaria de contestar sin un solo error:
+    ni excepcion, ni evento fallado, nada. El log con el nombre del campo es lo
+    que convierte esa caida muda en un grep.
+    """
+    payload = _payload_entrante("hola", wamid="wamid.raro")
+    payload["entry"][0]["changes"][0]["field"] = "mensajes_pero_con_otro_nombre"
+
+    with caplog.at_level("WARNING"):
+        r = await _postear(cliente, payload, monkeypatch)
+
+    assert r.json() == {"status": "ignored"}
+    assert "mensajes_pero_con_otro_nombre" in caplog.text
+
+
+async def test_un_status_de_entrega_no_ensucia_el_log(
+    db: AsyncSession,
+    cliente: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Los acuses de entrega y lectura llegan con field=`messages` y son la
+    mayoria del trafico. Si cayeran en el WARNING de arriba, el log quedaria
+    inservible justo para lo que se agrego."""
+    payload = _payload_entrante("hola", wamid="wamid.status")
+    valor = payload["entry"][0]["changes"][0]["value"]
+    del valor["messages"]
+    valor["statuses"] = [{"id": "wamid.status", "status": "delivered"}]
+
+    with caplog.at_level("WARNING"):
+        r = await _postear(cliente, payload, monkeypatch)
+
+    assert r.json() == {"status": "ignored"}
+    assert "no se maneja" not in caplog.text
 
 
 # --------------------------------------------------------------------------
