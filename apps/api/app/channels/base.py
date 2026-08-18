@@ -20,6 +20,28 @@ class IncomingMessage:
     external_id: str
 
 
+@dataclass(frozen=True)
+class OutgoingEcho:
+    """Un mensaje que salio del numero del negocio SIN pasar por nosotros.
+
+    Es lo que trae coexistence: el duenio del comercio contesta a mano desde la
+    app del celular y Meta nos avisa. Va en un tipo aparte y no en
+    `IncomingMessage` con un campo `direccion` a proposito: quien lo recibe
+    tiene que ramificar, porque tratar uno como el otro es justamente el error
+    caro —contestarle al duenio como si fuera un cliente, o pausar el bot con
+    la respuesta del propio bot—.
+
+    `to_number` es el usuario final, y es la identidad de la conversacion: en
+    un echo, `from` es el numero del comercio y no distingue un hilo de otro.
+    """
+
+    channel: str
+    to_number: str
+    text: str
+    phone_number_id: str
+    external_id: str
+
+
 class ChannelAdapter(Protocol):
     def parse_incoming(self, payload: dict) -> IncomingMessage | None: ...
 

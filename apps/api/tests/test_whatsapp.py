@@ -170,6 +170,68 @@ async def test_el_envio_manda_el_header_de_autorizacion(monkeypatch: pytest.Monk
     assert capturado["json"]["text"]["body"] == "hola"
 
 
+async def test_el_envio_devuelve_el_id_del_mensaje(monkeypatch: pytest.MonkeyPatch) -> None:
+    """★ Ese id es lo que evita que el bot se auto-pause con coexistence.
+
+    Cuando llegue el echo de este mismo mensaje, se lo reconoce por el id (ver
+    docs/coexistence.md). Sin el, queda solo la defensa por texto.
+    """
+
+    class _Respuesta:
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict:
+            return {"messages": [{"id": "wamid.HBgM123"}]}
+
+    class _ClienteFalso:
+        async def __aenter__(self) -> "_ClienteFalso":
+            return self
+
+        async def __aexit__(self, *a: object) -> None:
+            return None
+
+        async def post(self, url: str, json: dict, headers: dict) -> _Respuesta:
+            return _Respuesta()
+
+    monkeypatch.setattr(wa_client.httpx, "AsyncClient", lambda **kw: _ClienteFalso())
+
+    wamid = await send_text(
+        to="549111", text="hola", phone_number_id="PNID", access_token="EAAGtoken"
+    )
+    assert wamid == "wamid.HBgM123"
+
+
+async def test_un_envio_exitoso_sin_id_no_se_toma_como_fallido(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """El mensaje ya salio. Romper aca lo haria reenviar en el reintento."""
+
+    class _Respuesta:
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict:
+            return {"messages": []}
+
+    class _ClienteFalso:
+        async def __aenter__(self) -> "_ClienteFalso":
+            return self
+
+        async def __aexit__(self, *a: object) -> None:
+            return None
+
+        async def post(self, url: str, json: dict, headers: dict) -> _Respuesta:
+            return _Respuesta()
+
+    monkeypatch.setattr(wa_client.httpx, "AsyncClient", lambda **kw: _ClienteFalso())
+
+    assert (
+        await send_text(to="549111", text="hola", phone_number_id="PNID", access_token="EAAGtoken")
+        is None
+    )
+
+
 async def test_sin_token_no_se_intenta_enviar(monkeypatch: pytest.MonkeyPatch) -> None:
     """Falla con un error propio y claro, no con un 401 opaco de Meta."""
 

@@ -49,6 +49,46 @@ async def claim(
     return event_id
 
 
+async def registrar_propio(
+    db: AsyncSession,
+    channel: str,
+    external_id: str,
+    tenant_id: uuid.UUID | None = None,
+) -> None:
+    """Marca un id de mensaje NUESTRO como ya procesado, antes de que llegue.
+
+    ★ Es lo que evita que el bot se auto-pause con coexistence. Si Meta hace
+    echo tambien de los mensajes que enviamos por la Cloud API -no esta
+    confirmado, ver docs/coexistence.md-, el echo de la respuesta del bot
+    llegaria al webhook indistinguible de una que escribio una persona, y el
+    bot se callaria a si mismo para siempre.
+
+    Con el id ya reclamado, `claim` devuelve None y el echo se descarta como
+    duplicado. Es el mismo mecanismo de la idempotencia, usado al reves: en vez
+    de recordar lo que ya procesamos, se anticipa lo que no hay que procesar.
+
+    No levanta: no poder anotar el id no puede tumbar un envio que ya salio.
+    """
+    stmt = (
+        insert(ProcessedEvent)
+        .values(
+            channel=channel,
+            external_id=external_id,
+            tenant_id=tenant_id,
+            status=EventStatus.DONE.value,
+            attempts=0,
+        )
+        .on_conflict_do_nothing(index_elements=["channel", "external_id"])
+    )
+    try:
+        await db.execute(stmt)
+        await db.commit()
+    except Exception:  # noqa: BLE001
+        logger.exception(
+            "no se pudo anotar el id del mensaje propio", extra={"external_id": external_id}
+        )
+
+
 async def mark_done(db: AsyncSession, event_id: uuid.UUID) -> None:
     await db.execute(
         update(ProcessedEvent)

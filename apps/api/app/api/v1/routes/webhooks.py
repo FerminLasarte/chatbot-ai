@@ -10,8 +10,14 @@ Dos garantias que este modulo tiene que dar:
    ahi algo falla, Meta ya no va a reintentar: el error queda registrado en
    `processed_events` y el usuario recibe un mensaje de cortesia en vez de
    quedarse esperando para siempre.
+
+3. EL BOT NO SE PAUSA A SI MISMO. Con coexistence, Meta avisa por webhook de
+   los mensajes que el comercio escribe a mano desde el celular, y esos pausan
+   al bot. Si una respuesta del propio bot entrara por esa puerta, se callaria
+   solo y no volveria a contestar nunca. Ver `_recibir_echo`.
 """
 
+import json
 import logging
 import uuid
 
@@ -20,13 +26,19 @@ from sqlalchemy import select
 
 from app.api.v1.deps import DbSession
 from app.channels.whatsapp.client import send_text
-from app.channels.whatsapp.parser import parse_incoming
+from app.channels.whatsapp.parser import (
+    CAMPO_ECHOES,
+    CANAL_ECHO,
+    campo_del_evento,
+    parse_echo,
+    parse_incoming,
+)
 from app.core.config import settings
 from app.core.logging import tenant_id_ctx
 from app.core.security import verify_meta_signature
 from app.db.session import SessionLocal
 from app.models.tenant import Tenant
-from app.services import conversation, inbox, whatsapp
+from app.services import conversaciones, conversation, inbox, whatsapp
 from app.services.conversation import answer
 from app.services.quota import QuotaExcedida
 
@@ -37,6 +49,10 @@ MENSAJE_DE_CORTESIA = (
     "Perdon, tuve un problema tecnico y no pude procesar tu mensaje. "
     "Podes escribirme de nuevo en un momento."
 )
+
+# Cuanto payload crudo se loguea al no reconocer un evento. Alcanza de sobra
+# para un webhook de WhatsApp y evita llenar el log si Meta manda algo enorme.
+LARGO_PAYLOAD_EN_LOG = 4000
 
 # El usuario final no tiene por que enterarse de que el negocio agoto su cuota.
 MENSAJE_SIN_CUOTA = (
@@ -68,16 +84,18 @@ async def receive(
     if not verify_meta_signature(raw, x_hub_signature_256):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "firma invalida")
 
-    incoming = parse_incoming(await request.json())
+    payload = await request.json()
+
+    # Coexistence: el comercio contesto a mano desde el celular. Es un evento
+    # de otra naturaleza -sale del negocio, no entra- y tiene su propio camino.
+    if campo_del_evento(payload) == CAMPO_ECHOES:
+        return await _recibir_echo(payload, db, background)
+
+    incoming = parse_incoming(payload)
     if incoming is None:
         return {"status": "ignored"}  # status de entrega, reaccion, etc.
 
-    tenant = await db.scalar(
-        select(Tenant).where(
-            Tenant.whatsapp_phone_number_id == incoming.phone_number_id,
-            Tenant.is_active.is_(True),
-        )
-    )
+    tenant = await _tenant_por_numero(db, incoming.phone_number_id)
     if tenant is None:
         logger.warning("mensaje para un phone_number_id sin tenant asociado")
         return {"status": "unknown_tenant"}
@@ -99,6 +117,104 @@ async def receive(
         incoming.phone_number_id,
     )
     return {"status": "accepted"}
+
+
+async def _recibir_echo(
+    payload: dict, db: DbSession, background: BackgroundTasks
+) -> dict[str, str]:
+    """Un mensaje que salio del numero del negocio sin pasar por el bot.
+
+    Ver docs/coexistence.md. Mientras la funcion este apagada esto no actua:
+    solo deja el payload crudo en el log, que es como se confirma su forma real
+    sin arriesgar que una lectura equivocada silencie al bot.
+    """
+    if not settings.coexistence_enabled:
+        logger.warning(
+            "echo de coexistence recibido con la funcion apagada: %s",
+            json.dumps(payload)[:LARGO_PAYLOAD_EN_LOG],
+        )
+        return {"status": "coexistence_disabled"}
+
+    echo = parse_echo(payload)
+    if echo is None:
+        # No romper y no adivinar: queda el crudo para poder arreglar el parser.
+        logger.warning(
+            "echo de coexistence con forma no reconocida: %s",
+            json.dumps(payload)[:LARGO_PAYLOAD_EN_LOG],
+        )
+        return {"status": "ignored"}
+
+    tenant = await _tenant_por_numero(db, echo.phone_number_id)
+    if tenant is None:
+        logger.warning("echo para un phone_number_id sin tenant asociado")
+        return {"status": "unknown_tenant"}
+
+    tenant_id_ctx.set(str(tenant.id))
+
+    # ★ ACA se corta la auto-pausa. Cada mensaje que enviamos por la Cloud API
+    # deja su id anotado (ver `_registrar_envio_propio`), asi que si Meta
+    # tambien hace echo de nuestros propios envios, el reclamo falla y el echo
+    # se descarta. Sin esto, el bot se pausaria con su propia respuesta.
+    event_id = await inbox.claim(db, echo.channel, echo.external_id, tenant.id)
+    if event_id is None:
+        return {"status": "duplicate"}
+
+    background.add_task(_handle_echo, event_id, tenant.id, echo.to_number, echo.text)
+    return {"status": "accepted"}
+
+
+async def _handle_echo(
+    event_id: uuid.UUID, tenant_id: uuid.UUID, to_number: str, text: str
+) -> None:
+    """Guarda lo que escribio la persona y calla al bot en ese hilo.
+
+    Repetir la pausa corre el vencimiento: mientras el duenio siga contestando,
+    la pausa se estira sola, y cuando deja de hacerlo el bot vuelve. Es el mismo
+    comportamiento del boton del portal, sin que nadie tenga que apretarlo.
+
+    Como el resto del procesamiento en background, aca no puede escapar nada.
+    A diferencia de `_handle`, un fallo NO manda mensaje de cortesia: el evento
+    es una respuesta del negocio, y escribirle al cliente final "tuve un
+    problema" seria meter al bot justo donde se le pidio que no se meta.
+    """
+    tenant_id_ctx.set(str(tenant_id))
+    try:
+        async with SessionLocal() as db:
+            tenant = await db.get(Tenant, tenant_id)
+            if tenant is None:
+                raise RuntimeError(f"el tenant {tenant_id} desaparecio entre el claim y el handle")
+
+            # La identidad del hilo es el usuario final: en un echo ese es el
+            # DESTINATARIO, no el remitente (el remitente es el comercio).
+            conversacion = await conversation.resolver_conversacion(
+                db, tenant, channel="whatsapp", external_id=to_number
+            )
+
+            if await conversation.coincide_con_la_ultima_respuesta(db, conversacion.id, text):
+                # Llegar aca significa que el filtro por id no alcanzo. No es
+                # fatal -por eso existe esta segunda linea- pero hay que verlo:
+                # si pasa seguido, Meta hace echo de nuestros envios y el id no
+                # los esta cubriendo.
+                logger.warning(
+                    "echo identico a la ultima respuesta del bot: se descarta para no auto-pausar",
+                    extra={"tenant_id": str(tenant_id), "conversation_id": str(conversacion.id)},
+                )
+                await inbox.mark_done(db, event_id)
+                return
+
+            await conversation.registrar_saliente(db, conversacion, text)
+            await conversaciones.pausar(
+                db, tenant_id, conversacion.id, horas=settings.manual_mode_hours
+            )
+            logger.info(
+                "respuesta manual desde el celular: bot pausado en esta conversacion",
+                extra={"tenant_id": str(tenant_id), "conversation_id": str(conversacion.id)},
+            )
+            await inbox.mark_done(db, event_id)
+
+    except Exception as exc:  # noqa: BLE001 — frontera: aca no puede escapar nada
+        logger.exception("fallo el procesamiento de un echo", extra={"event_id": str(event_id)})
+        await _registrar_fallo(event_id, exc)
 
 
 async def _handle(
@@ -165,27 +281,39 @@ async def _handle(
                     "mensaje no atendido por cuota agotada",
                     extra={"tenant_id": str(tenant_id)},
                 )
-                await send_text(
+                wamid = await send_text(
                     to=to_number,
                     text=MENSAJE_SIN_CUOTA,
                     phone_number_id=phone_number_id,
                     access_token=token or "",
                 )
+                await _registrar_envio_propio(tenant_id, wamid)
                 await inbox.mark_done(db, event_id)
                 return
 
-            await send_text(
+            wamid = await send_text(
                 to=to_number,
                 text=reply,
                 phone_number_id=phone_number_id,
                 access_token=token or "",
             )
+            await _registrar_envio_propio(tenant_id, wamid)
             await inbox.mark_done(db, event_id)
 
     except Exception as exc:  # noqa: BLE001 — frontera: aca no puede escapar nada
         logger.exception("fallo el procesamiento del mensaje", extra={"event_id": str(event_id)})
         await _registrar_fallo(event_id, exc)
-        await _avisar_al_usuario(to_number, phone_number_id, token)
+        await _avisar_al_usuario(tenant_id, to_number, phone_number_id, token)
+
+
+async def _tenant_por_numero(db: DbSession, phone_number_id: str) -> Tenant | None:
+    """El cliente duenio de un numero de WhatsApp, si esta activo."""
+    return await db.scalar(
+        select(Tenant).where(
+            Tenant.whatsapp_phone_number_id == phone_number_id,
+            Tenant.is_active.is_(True),
+        )
+    )
 
 
 async def _registrar_fallo(event_id: uuid.UUID, exc: Exception) -> None:
@@ -198,7 +326,7 @@ async def _registrar_fallo(event_id: uuid.UUID, exc: Exception) -> None:
 
 
 async def _avisar_al_usuario(
-    to_number: str, phone_number_id: str, access_token: str | None
+    tenant_id: uuid.UUID, to_number: str, phone_number_id: str, access_token: str | None
 ) -> None:
     """Mejor un 'tuve un problema' que un silencio indistinguible de ser ignorado.
 
@@ -209,11 +337,35 @@ async def _avisar_al_usuario(
         logger.error("sin access token: no se puede avisar al usuario del fallo")
         return
     try:
-        await send_text(
+        wamid = await send_text(
             to=to_number,
             text=MENSAJE_DE_CORTESIA,
             phone_number_id=phone_number_id,
             access_token=access_token,
         )
+        await _registrar_envio_propio(tenant_id, wamid)
     except Exception:  # noqa: BLE001
         logger.exception("no se pudo entregar ni el mensaje de cortesia")
+
+
+async def _registrar_envio_propio(tenant_id: uuid.UUID, wamid: str | None) -> None:
+    """Anota el id de un mensaje que enviamos nosotros, para no leerlo de vuelta.
+
+    ★ Es la defensa principal contra la auto-pausa por coexistence: cuando
+    llegue el echo de este mismo mensaje -si es que Meta los manda-, su id ya
+    va a estar reclamado y el webhook lo va a descartar como duplicado.
+
+    Sesion propia, por el mismo motivo que `_registrar_fallo`: uno de los
+    llamadores corre despues de una excepcion, con la sesion anterior en estado
+    dudoso.
+    """
+    if not wamid:
+        # Sin id queda solo la segunda linea de defensa (comparar el texto con
+        # la ultima respuesta del bot, ver services/conversation.py).
+        logger.warning("envio sin id de mensaje: el echo propio no se va a poder filtrar por id")
+        return
+    try:
+        async with SessionLocal() as db:
+            await inbox.registrar_propio(db, CANAL_ECHO, wamid, tenant_id)
+    except Exception:  # noqa: BLE001
+        logger.exception("no se pudo anotar el envio propio", extra={"external_id": wamid})

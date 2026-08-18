@@ -109,6 +109,41 @@ async def registrar_entrante(db: AsyncSession, conversacion: Conversation, texto
     await _tocar_actividad(db, conversacion)
 
 
+async def registrar_saliente(db: AsyncSession, conversacion: Conversation, texto: str) -> None:
+    """Guarda como respuesta del asistente algo que escribio una PERSONA.
+
+    Es el camino de coexistence: el duenio del comercio contesto desde el
+    celular y Meta nos avisa. Se guarda con rol `assistant` -no con uno nuevo-
+    porque desde el lugar del usuario final es lo mismo: el negocio le
+    respondio. Cuando la pausa venza y el bot retome, la historia que ve el
+    modelo tiene lo que dijo la persona en vez de un agujero.
+    """
+    await _guardar_mensaje(db, conversacion.id, ROL_ASISTENTE, texto)
+    await _tocar_actividad(db, conversacion)
+
+
+async def coincide_con_la_ultima_respuesta(
+    db: AsyncSession, conversation_id: uuid.UUID, texto: str
+) -> bool:
+    """Si `texto` es, palabra por palabra, lo ultimo que dijo el bot.
+
+    ★ Segunda linea de defensa contra la auto-pausa (ver docs/coexistence.md).
+    Si Meta hiciera echo tambien de nuestros propios envios y el filtro por id
+    fallara, el bot se callaria a si mismo con su propia respuesta y dejaria de
+    contestar. El costo de los dos errores no es simetrico: un falso positivo
+    -una persona que escribe exactamente lo que acaba de decir el bot- solo
+    posterga la pausa hasta el mensaje siguiente; un falso negativo deja al
+    comercio mudo hasta que alguien lo note.
+    """
+    ultimo = await db.scalar(
+        select(Message)
+        .where(Message.conversation_id == conversation_id)
+        .order_by(Message.position.desc())
+        .limit(1)
+    )
+    return ultimo is not None and ultimo.role == ROL_ASISTENTE and ultimo.content == texto
+
+
 # ---------------------------------------------------------------------------
 # Identidad de la conversacion
 # ---------------------------------------------------------------------------

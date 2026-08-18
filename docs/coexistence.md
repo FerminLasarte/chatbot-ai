@@ -1,7 +1,8 @@
 # Coexistence: el comercio contesta a mano y el bot sigue andando
 
-Estado: **investigado, sin implementar**. Este documento es el traspaso para la
-sesion que lo implemente.
+Estado: **codigo implementado y apagado por defecto** (`COEXISTENCE_ENABLED=false`).
+Falta la configuracion del lado de Meta y confirmar el payload real contra un
+numero de prueba. Lo que queda por hacer esta al final, en "Como prenderlo".
 
 ## Que problema resuelve
 
@@ -49,9 +50,10 @@ ademas de `messages`:
 - Si el numero es nuevo y nunca paso por la app, NO usar el flujo de
   coexistence: va el Embedded Signup estandar, que es el que ya tenemos.
 
-## Lo que ya esta hecho en el codigo (no rehacer)
+## Sobre que se apoya: el modo manual, que ya existia
 
-La mitad dificil esta. El "modo manual" ya existe y funciona:
+Coexistence no invento la pausa, solo la dispara sola. El "modo manual" ya
+estaba y no se toco:
 
 - `Conversation.pausada_hasta` + `Conversation.en_modo_manual()` en
   `apps/api/app/models/tenant.py:132`. Es fecha de vencimiento, no booleano, a
@@ -66,10 +68,60 @@ La mitad dificil esta. El "modo manual" ya existe y funciona:
 - Default de horas: `settings.manual_mode_hours` (8).
 - Tests: `apps/api/tests/test_modo_manual.py`.
 
-Lo unico que falta es que la pausa se dispare **sola** cuando el humano contesta
-desde el celular, en vez de a mano desde el portal.
+## Lo que ya esta implementado
 
-## Lo que hay que implementar
+Todo el lado del codigo, detras de `COEXISTENCE_ENABLED` (default `false`).
+
+**El interruptor** — `settings.coexistence_enabled`. Apagado, un echo que llegue
+se registra CRUDO en el log y no se actua sobre el. Ese log es justamente como
+se confirma la forma real del payload sin arriesgar nada.
+
+**Lectura del payload** — `parse_echo` en
+`apps/api/app/channels/whatsapp/parser.py`, sobre un tipo nuevo `OutgoingEcho`
+(`channels/base.py`). Lee campo por campo y con `.get()`: cualquier forma que no
+entienda devuelve `None` y queda crudo en el log, en vez de actuar sobre una
+lectura equivocada. Acepta la lista como `message_echoes` o como `messages`,
+porque la forma exacta sigue sin confirmarse y equivocarse en ese nombre
+significaria ignorar en silencio todos los mensajes manuales.
+
+**`parse_incoming` ahora filtra por el nombre del campo.** Antes leia cualquier
+`value["messages"]`. Un payload de echo tiene una forma bastante parecida: sin
+el filtro, el bot podia leer como pregunta de un cliente algo que escribio el
+propio duenio, contestarsela y cobrarle el turno. Los payloads sin `field`
+siguen entrando, asi que no rompe nada de lo que ya andaba.
+
+**El efecto** — `_recibir_echo` y `_handle_echo` en
+`apps/api/app/api/v1/routes/webhooks.py`: resuelven la conversacion por el
+numero del DESTINATARIO, guardan el mensaje con rol `assistant`
+(`conversation.registrar_saliente`) y llaman a `conversaciones.pausar(...)` con
+`settings.manual_mode_hours`. Cada mensaje manual corre el vencimiento, asi que
+la pausa se estira sola mientras la persona sigue contestando. Un fallo aca NO
+manda mensaje de cortesia al cliente final: seria meter al bot justo donde se le
+pidio que no se meta.
+
+**Las dos defensas contra la auto-pausa.** Era la trampa critica del plan
+original: si Meta hiciera echo tambien de los mensajes que enviamos por la Cloud
+API, el bot se pausaria con su propia respuesta y no volveria a contestar nunca.
+Estan las dos porque no sabemos todavia si el caso existe:
+
+1. *Por id.* `send_text` ahora devuelve el wamid, y cada envio nuestro lo deja
+   anotado con `inbox.registrar_propio` en el canal `whatsapp_echo`. Cuando
+   llegue el echo de ese mismo mensaje, `claim` falla y se descarta como
+   duplicado. Es el mecanismo de la idempotencia usado al reves: en vez de
+   recordar lo ya procesado, se anticipa lo que no hay que procesar.
+2. *Por texto.* `conversation.coincide_con_la_ultima_respuesta`: si el echo es
+   palabra por palabra lo ultimo que dijo el bot, se descarta y se loguea en
+   WARNING. Cubre la carrera en la que el echo llega antes de que se anote el id.
+   Si ese warning aparece seguido en produccion, significa que Meta SI hace echo
+   de nuestros envios y que el filtro por id no los esta cubriendo.
+
+**Idempotencia** — los echoes van por el canal `whatsapp_echo`, con espacio de
+ids separado del entrante. La duda de si podian colisionar queda resuelta por
+construccion.
+
+Tests: `apps/api/tests/test_coexistence.py` (25 casos).
+
+## Lo que falta
 
 ### 1. Configuracion en el Meta App Dashboard (no es codigo)
 
@@ -81,74 +133,51 @@ la app de WhatsApp Business, y suscribir el WABA a `smb_message_echoes` (y
 distinto del actual (`settings.whatsapp_config_id`, uno solo hoy). Si necesita
 uno propio, hay que decidir si se reemplaza o si el onboarding soporta los dos
 caminos (numero nuevo -> flujo actual; numero que ya usa la app -> coexistence).
-Esto cambia el alcance del punto 4.
+Esto cambia el alcance del punto 3.
 
-### 2. `apps/api/app/channels/whatsapp/parser.py`
+### 2. Confirmar el payload real
 
-Hoy `parse_incoming` solo mira `value["messages"]` y devuelve `None` para todo
-lo demas — o sea, un echo hoy se ignora en silencio.
+Es lo unico que bloquea el prendido. Activar coexistence en un numero de prueba,
+mandar un mensaje a mano desde el celular y buscar en el log de Railway:
 
-Hay que agregar el reconocimiento de `smb_message_echoes`. Como el dataclass
-`IncomingMessage` (`apps/api/app/channels/base.py`) no distingue direccion,
-probablemente convenga:
+    echo de coexistence recibido con la funcion apagada: {...}
 
-- un tipo nuevo (`OutgoingEcho` o similar) o un campo `direccion` en
-  `IncomingMessage`, y
-- que `parse_incoming` devuelva algo que el webhook pueda ramificar.
+Comparar ese JSON con `_payload_echo` en `tests/test_coexistence.py`, que es la
+hipotesis que implementa el parser. Si difiere, corregir los dos.
 
-★ DUDA ABIERTA: **no tenemos confirmada la forma exacta del JSON de
-`smb_message_echoes`**. No escribir el parser a ciegas: activar coexistence en un
-numero de prueba, loguear el payload crudo que llega, y recien ahi escribirlo.
+En la misma prueba se responde la otra duda: mandar un mensaje CON el bot (que
+conteste solo) y ver si aparece un segundo log de echo con ese mismo mensaje.
+Si aparece, Meta hace echo de los envios por Cloud API y las dos defensas de
+arriba pasan de ser un seguro a ser el mecanismo principal.
 
-### 3. `apps/api/app/api/v1/routes/webhooks.py`
+### 3. Onboarding (`apps/web/src/app/onboarding/` + `apps/api/.../onboarding`)
 
-Cuando llega un echo (mensaje que mando el humano desde el celular):
-
-1. Resolver la conversacion con `conversation.resolver_conversacion(...)` usando
-   el numero del **destinatario** (el cliente final), no el del comercio.
-2. Guardar el mensaje con rol `assistant` (`ROL_ASISTENTE` en
-   `services/conversation.py:38`), para que el historial que ve el modelo cuando
-   retome incluya lo que dijo la persona. Hoy `registrar_entrante` solo guarda
-   con rol `user`; hace falta el equivalente para el lado saliente.
-3. Llamar a `conversaciones.pausar(...)` con `settings.manual_mode_hours`.
-   Repetir la llamada corre el vencimiento, asi que cada mensaje manual estira
-   la pausa sola — que es exactamente el comportamiento que queremos.
-
-★ TRAMPA CRITICA: hay que verificar si los mensajes que manda **nuestro propio
-bot** por la Cloud API tambien generan un evento `smb_message_echoes`. Si lo
-hicieran y no se filtran, el bot se auto-pausaria con su propia respuesta y
-dejaria de contestar para siempre. La documentacion dice que los echoes son de
-mensajes enviados desde la app, pero **esto hay que confirmarlo con el payload
-real antes de mergear**. Si hace falta filtrar, el discriminador candidato es el
-id del mensaje (los nuestros los conocemos al enviar) o algun campo tipo
-`smb_app_id` en el payload.
-
-★ IDEMPOTENCIA: los echoes tienen su propio id de mensaje. Pasan por
-`inbox.claim(db, channel, external_id, tenant_id)`, que tiene unique en
-`(channel, external_id)`. Verificar que un echo no colisione con el id del
-mensaje entrante original. Si hiciera falta, usar un `channel` distinto
-(`"whatsapp_echo"`) para separar los espacios de ids.
-
-### 4. Onboarding (`apps/web/src/app/onboarding/` + `apps/api/.../onboarding`)
-
-Depende de lo que se resuelva en el punto 1. Como minimo, el flujo actual asume
-un solo camino; con coexistence el alta pasa a requerir el celular del duenio en
-la mano (QR). El link de onboarding deberia abrirse desde el celular o al lado
-de la persona.
+Sin tocar: depende de lo que se resuelva en el punto 1. Como minimo, el flujo
+actual asume un solo camino; con coexistence el alta pasa a requerir el celular
+del duenio en la mano (QR). El link de onboarding deberia abrirse desde el
+celular o al lado de la persona.
 
 Ver `apps/api/app/services/whatsapp.py:113` (canje -> suscripcion -> registro).
 `registrar_numero` ya contempla el caso de migrar un numero que venia de la app.
 
-## Dudas para resolver antes de escribir codigo
+## Como prenderlo
 
-1. Forma exacta del payload de `smb_message_echoes`. **Bloqueante** para el
-   parser. Se resuelve activando coexistence en un numero de prueba y logueando.
-2. Si los envios del propio bot generan echo. **Bloqueante**: define si hace
-   falta filtro anti-auto-pausa.
-3. Si coexistence necesita su propio `config_id` en el Meta App Dashboard.
-4. Si los tenants ya dados de alta con el Embedded Signup estandar pueden sumar
+1. Configurar el lado de Meta (punto 1) en un numero de prueba.
+2. Confirmar el payload con el log (punto 2) y corregir el parser si difiere.
+3. `COEXISTENCE_ENABLED=true` en las variables de Railway. No hay que tocar
+   codigo ni migrar nada.
+4. Mirar el log por un dia. Si aparece
+   `echo identico a la ultima respuesta del bot`, la defensa por id no esta
+   funcionando y hay que revisarla antes de sumar mas clientes.
+
+Para apagarlo, la variable vuelve a `false` y el bot ignora los echoes al toque.
+
+## Dudas que quedan abiertas
+
+1. Si coexistence necesita su propio `config_id` en el Meta App Dashboard.
+2. Si los tenants ya dados de alta con el Embedded Signup estandar pueden sumar
    coexistence sobre el mismo numero, o si hay que re-onboardearlos.
-5. Si Meta cuenta la antiguedad desde el uso del WhatsApp comun o desde la
+3. Si Meta cuenta la antiguedad desde el uso del WhatsApp comun o desde la
    conversion a WhatsApp Business app. Afecta a un comercio que recien convierte.
 
 ## Fuentes

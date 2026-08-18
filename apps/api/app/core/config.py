@@ -69,6 +69,18 @@ class Settings(BaseSettings):
     # que la pausa vence en vez de quedar prendida hasta que alguien la apague.
     manual_mode_hours: int = 8
 
+    # --- Coexistence (el comercio contesta a mano desde el celular) ---
+    # Apagado por defecto A PROPOSITO. La forma exacta del webhook
+    # `smb_message_echoes` no esta confirmada contra un evento real de Meta, y
+    # el modo de fallar es caro: si el bot leyera mal un echo podria pausarse
+    # con su propia respuesta y dejar al comercio mudo.
+    #
+    # Con esto apagado, los echoes que lleguen se registran CRUDOS en el log y
+    # no se actua sobre ellos: es justamente el paso que falta para confirmar
+    # el payload. Una vez confirmado, esto se prende y no hay que tocar codigo.
+    # Ver docs/coexistence.md.
+    coexistence_enabled: bool = False
+
     # --- Cuotas ---
     # Valor con el que nace cada cliente nuevo. Se puede ajustar por cliente
     # despues; esto es solo el default para no crear nunca uno sin tope.
