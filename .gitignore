@@ -160,3 +160,7 @@ desktop.ini
 !.vscode/settings.json
 !.vscode/extensions.json
 !.vscode/launch.json
+
+# ═══════════════ Claude Code ═══════════════
+# Config local de la sesion (permisos, launch.json): no se comparte con el equipo
+.claude/
