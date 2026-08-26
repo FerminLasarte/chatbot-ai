@@ -18,6 +18,28 @@ import { conectarWhatsApp } from "../acciones";
 
 type DatosSignup = { waba_id: string; phone_number_id: string };
 
+// Los dos caminos de alta. NO son la misma pantalla de Meta con un detalle
+// distinto: el `featureType` decide cual de los dos asistentes abre el popup, y
+// elegir mal deja al cliente sin salida.
+//
+//   "existente" -> coexistence. El numero que ya vive en la app WhatsApp
+//                  Business del celular queda tambien en la Cloud API. Pide
+//                  escanear un QR, asi que el celular tiene que estar en la
+//                  mano.
+//   "nuevo"     -> el alta estandar, la que ya andaba. Da de alta un numero que
+//                  no esta en ninguna app.
+//
+// ★ Con `featureType: ""` (lo que habia antes para los dos casos) Meta abre
+// siempre el asistente estandar. A alguien que venia a conectar SU numero le
+// ofrece un numero virtual nuevo, que es exactamente lo contrario de lo que
+// vino a hacer.
+const FEATURE_TYPE = {
+  existente: "whatsapp_business_app_onboarding",
+  nuevo: "",
+} as const;
+
+type Camino = keyof typeof FEATURE_TYPE;
+
 type Estado =
   | { paso: "listo" }
   | { paso: "conectando" }
@@ -53,6 +75,9 @@ export function BotonConectar({
 }) {
   const [estado, setEstado] = useState<Estado>({ paso: "listo" });
   const [sdkListo, setSdkListo] = useState(false);
+  // Sin default a proposito: los dos caminos son irreversibles para el cliente y
+  // ninguno es el "normal". Que elija.
+  const [camino, setCamino] = useState<Camino | null>(null);
   const datos = useRef<DatosSignup | null>(null);
 
   // --- Mensajes del popup ---
@@ -123,7 +148,7 @@ export function BotonConectar({
   );
 
   const abrirPopup = useCallback(() => {
-    if (!window.FB) return;
+    if (!window.FB || !camino) return;
     setEstado({ paso: "listo" });
 
     window.FB.login(
@@ -149,10 +174,10 @@ export function BotonConectar({
         // servidor, que es el unico lado donde vive el App Secret.
         response_type: "code",
         override_default_response_type: true,
-        extras: { setup: {}, featureType: "", sessionInfoVersion: "3" },
+        extras: { setup: {}, featureType: FEATURE_TYPE[camino], sessionInfoVersion: "3" },
       },
     );
-  }, [configId, finalizar]);
+  }, [camino, configId, finalizar]);
 
   if (estado.paso === "ok") {
     return (
@@ -197,10 +222,36 @@ export function BotonConectar({
         }
       />
 
+      {/* La pregunta esta redactada desde lo que el cliente sabe de su propio
+          negocio ("uso WhatsApp Business en el celular"), no desde como se
+          llama el flujo del lado de Meta: "coexistence" no le dice nada a nadie
+          fuera de esta oficina. */}
+      <fieldset className="flex flex-col gap-2" disabled={estado.paso === "conectando"}>
+        <legend className="mb-1 text-sm font-medium text-zinc-900 dark:text-zinc-100">
+          &iquest;Qu&eacute; n&uacute;mero vas a usar?
+        </legend>
+
+        <Opcion
+          valor="existente"
+          elegido={camino}
+          alElegir={setCamino}
+          titulo="El que ya uso en WhatsApp Business"
+          detalle="Segui contestando desde tu celular como siempre, y el bot atiende en el mismo numero. Tene el celular a mano: te va a pedir escanear un codigo QR."
+        />
+
+        <Opcion
+          valor="nuevo"
+          elegido={camino}
+          alElegir={setCamino}
+          titulo="Un numero nuevo, solo para el bot"
+          detalle="Para un numero que todavia no esta dado de alta en ninguna app de WhatsApp."
+        />
+      </fieldset>
+
       <button
         type="button"
         onClick={abrirPopup}
-        disabled={!sdkListo || estado.paso === "conectando"}
+        disabled={!sdkListo || !camino || estado.paso === "conectando"}
         className="rounded-md bg-[#1877F2] px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-[#166FE5] disabled:opacity-40"
       >
         {estado.paso === "conectando"
@@ -219,5 +270,45 @@ export function BotonConectar({
         </p>
       )}
     </div>
+  );
+}
+
+/** Una de las dos opciones de alta. Un radio de verdad y no un div con onClick:
+ *  esta pagina se abre casi siempre desde el celular. */
+function Opcion({
+  valor,
+  elegido,
+  alElegir,
+  titulo,
+  detalle,
+}: {
+  valor: Camino;
+  elegido: Camino | null;
+  alElegir: (c: Camino) => void;
+  titulo: string;
+  detalle: string;
+}) {
+  const activo = elegido === valor;
+  return (
+    <label
+      className={`flex cursor-pointer gap-3 rounded-md border p-3 transition-colors ${
+        activo
+          ? "border-[#1877F2] bg-blue-50 dark:bg-blue-950/40"
+          : "border-zinc-200 hover:border-zinc-300 dark:border-zinc-800 dark:hover:border-zinc-700"
+      }`}
+    >
+      <input
+        type="radio"
+        name="camino-de-alta"
+        value={valor}
+        checked={activo}
+        onChange={() => alElegir(valor)}
+        className="mt-1 accent-[#1877F2]"
+      />
+      <span className="flex flex-col gap-0.5">
+        <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{titulo}</span>
+        <span className="text-xs text-zinc-600 dark:text-zinc-400">{detalle}</span>
+      </span>
+    </label>
   );
 }

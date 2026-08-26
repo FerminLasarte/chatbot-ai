@@ -59,9 +59,12 @@ ademas de `messages`:
 - App version >= 2.24.17, celular **con camara**: el alta pide escanear un QR.
 - Hay que abrir la app al menos **cada 13 dias** o el puente se corta. Si el
   comercio delega todo al bot y deja el telefono en un cajon, se le desconecta.
-- Throughput fijo de **5 mensajes por segundo** por numero. Irrelevante para
+- Throughput fijo de **20 mensajes por segundo** por numero (Meta lo subio de
+  los 5 que decia esta nota antes; verificado el 2026-08-26). Irrelevante para
   nosotros: el bot contesta 1:1 y no hay envio masivo en el codigo. Solo
   molestaria con campanias masivas.
+- El cliente tiene **24 horas** desde que arranca el Embedded Signup para
+  terminar el alta. Pasado ese plazo hay que empezar de cero.
 - No soporta la Marketing Messages Lite API. A tener en cuenta si algun dia
   vendemos "mandale una promo a toda tu base".
 - Si el numero es nuevo y nunca paso por la app, NO usar el flujo de
@@ -142,9 +145,18 @@ Tests: `apps/api/tests/test_coexistence.py` (32 casos).
 
 ### 1. Configuracion en el Meta App Dashboard (no es codigo)
 
-Crear/ajustar la configuracion de Embedded Signup para onboarding de usuarios de
-la app de WhatsApp Business, y suscribir el WABA a `smb_message_echoes` (y
-`smb_app_state_sync` / `history` si se decide usarlos).
+Suscribir el WABA a los **tres** campos: `smb_message_echoes`, `history` y
+`smb_app_state_sync`. Meta los pide todos para coexistence, aunque el codigo
+solo actua sobre el primero.
+
+★ RESUELTO EN CODIGO (2026-08-26). Lo que abre el asistente de coexistence no
+es una opcion del dashboard sino el `featureType` del `FB.login`, en
+`apps/web/src/app/onboarding/[token]/conectar.tsx`. Iba en `""` para todos, que
+es el asistente estandar: a un comercio que venia a conectar SU numero, Meta le
+ofrecia dar de alta un numero virtual nuevo, sin ninguna opcion de usar el
+propio. Ahora el link pregunta cual de los dos caminos quiere y manda
+`whatsapp_business_app_onboarding` o `""` segun la respuesta. El valor viejo
+`coexistence` ya no existe del lado de Meta.
 
 Los tres campos: `smb_message_echoes` (el unico que usa el codigo), mas
 `history` y `smb_app_state_sync`. Estos dos ultimos el webhook los ignora
@@ -173,10 +185,14 @@ desactualizada y las dos defensas pasarian de seguro a mecanismo principal.
 
 ### 3. Onboarding (`apps/web/src/app/onboarding/` + `apps/api/.../onboarding`)
 
-Sin tocar: depende de lo que se resuelva en el punto 1. Como minimo, el flujo
-actual asume un solo camino; con coexistence el alta pasa a requerir el celular
-del duenio en la mano (QR). El link de onboarding deberia abrirse desde el
-celular o al lado de la persona.
+HECHO (2026-08-26). El link ya no asume un solo camino: pregunta si el numero es
+el que ya se usa en la app WhatsApp Business o si es uno nuevo, y de ahi sale el
+`featureType`. La pregunta no tiene default a proposito — los dos caminos son
+irreversibles para el cliente y ninguno es el "normal".
+
+Sigue en pie que el alta por coexistence **requiere el celular del duenio en la
+mano** (escanea un QR), asi que el link conviene abrirlo desde el celular o al
+lado de la persona.
 
 Ver `apps/api/app/services/whatsapp.py:113` (canje -> suscripcion -> registro).
 `registrar_numero` ya contempla el caso de migrar un numero que venia de la app.
