@@ -67,7 +67,7 @@ async def ver_estado(token: str, db: DbSession) -> OnboardingEstado:
         nombre_cliente=tenant.name,
         app_id=settings.whatsapp_app_id,
         config_id=settings.whatsapp_config_id,
-        api_version=settings.whatsapp_api_version,
+        api_version=settings.whatsapp_signup_api_version,
         ya_conectado=whatsapp.tiene_whatsapp(tenant),
     )
 

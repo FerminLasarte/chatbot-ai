@@ -106,6 +106,21 @@ class Settings(BaseSettings):
     whatsapp_app_secret: str = ""
     whatsapp_api_version: str = "v21.0"
 
+    # La version con la que se inicializa el SDK de Facebook en el navegador,
+    # para el alta. Va SEPARADA de la de arriba a proposito: son dos cosas
+    # distintas que solo por casualidad se llaman igual. La de arriba es la URL
+    # contra la que el servidor manda mensajes, y cambiarla cambia el
+    # comportamiento de todos los bots andando. Esta solo decide que asistente
+    # de alta le dibuja Meta al cliente.
+    #
+    # ★ Tiene que ser una version posterior a que exista la funcion que se pide
+    # en `extras.featureType`. Con el SDK en v21.0 (octubre 2024) y coexistence
+    # disponible desde mayo 2025, Meta ignoraba
+    # `whatsapp_business_app_onboarding` sin decir nada y abria el asistente
+    # estandar, el de numero nuevo. No hay error ni aviso: simplemente sale la
+    # pantalla equivocada.
+    whatsapp_signup_api_version: str = "v26.0"
+
     # --- Alta de clientes por Embedded Signup ---
     # Estos dos SI son publicos: viajan al navegador porque los necesita el SDK
     # de Facebook para abrir el popup. No son secretos —el que si lo es, y nunca
