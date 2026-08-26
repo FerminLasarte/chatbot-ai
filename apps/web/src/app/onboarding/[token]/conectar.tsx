@@ -67,11 +67,15 @@ export function BotonConectar({
   appId,
   configId,
   apiVersion,
+  children,
 }: {
   token: string;
   appId: string;
   configId: string;
   apiVersion: string;
+  /** El aviso de terminos y privacidad. Lo pone la pagina, se dibuja aca para
+   *  que quede entre la eleccion del numero y el boton. */
+  children?: React.ReactNode;
 }) {
   const [estado, setEstado] = useState<Estado>({ paso: "listo" });
   const [sdkListo, setSdkListo] = useState(false);
@@ -236,17 +240,19 @@ export function BotonConectar({
           elegido={camino}
           alElegir={setCamino}
           titulo="El que ya uso en WhatsApp Business"
-          detalle="Segui contestando desde tu celular como siempre, y el bot atiende en el mismo numero. Tene el celular a mano: te va a pedir escanear un codigo QR."
+          detalle="Seguís contestando desde tu celular como siempre, y el bot atiende en el mismo número. Te va a pedir escanear un código QR, así que tené el celular al lado."
         />
 
         <Opcion
           valor="nuevo"
           elegido={camino}
           alElegir={setCamino}
-          titulo="Un numero nuevo, solo para el bot"
-          detalle="Para un numero que todavia no esta dado de alta en ninguna app de WhatsApp."
+          titulo="Un número nuevo, solo para el bot"
+          detalle="Para un número que no esté dado de alta en ninguna app de WhatsApp, ni la común ni la Business."
         />
       </fieldset>
+
+      {children}
 
       <button
         type="button"

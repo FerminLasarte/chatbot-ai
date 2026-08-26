@@ -70,33 +70,38 @@ export default async function Onboarding({ params }: { params: Promise<{ token: 
         asistente. Son un par de minutos y no hace falta configurar nada m&aacute;s.
       </p>
 
+      {/* Solo lo que vale para los DOS caminos de alta. Lo que cambia segun el
+          camino (que el numero no este en ninguna app, o que haya que escanear
+          un QR) va en la opcion que corresponde, adentro de BotonConectar: una
+          instruccion suelta aca arriba que contradiga a la opcion elegida es
+          peor que no ponerla. */}
       <ul className="mt-4 mb-5 list-disc space-y-1 pl-5 text-sm text-zinc-500">
-        <li>Us&aacute; un n&uacute;mero que no est&eacute; activo en la app de WhatsApp comun.</li>
-        <li>Ten&eacute; a mano el tel&eacute;fono: Facebook te manda un c&oacute;digo.</li>
+        <li>Ten&eacute; el tel&eacute;fono a mano: te va a pedir confirmar el n&uacute;mero.</li>
         <li>No cierres la ventana hasta que termine.</li>
       </ul>
-
-      {/* Meta mira esta pantalla en la revision de la app, y ademas es lo justo:
-          antes de conectar su WhatsApp el cliente tiene que poder leer que
-          hacemos con los datos. */}
-      <p className="mt-5 text-xs text-zinc-500">
-        Al conectar acept&aacute;s nuestros{" "}
-        <a href="/terminos" className="underline">
-          t&eacute;rminos
-        </a>{" "}
-        y la{" "}
-        <a href="/privacidad" className="underline">
-          pol&iacute;tica de privacidad
-        </a>
-        .
-      </p>
 
       <BotonConectar
         token={token}
         appId={estado.app_id}
         configId={estado.config_id}
         apiVersion={estado.api_version}
-      />
+      >
+        {/* Va como children para que quede pegado al boton, despues de la
+            eleccion del numero. Meta mira esta pantalla en la revision de la
+            app, y ademas es lo justo: antes de conectar su WhatsApp el cliente
+            tiene que poder leer que hacemos con los datos. */}
+        <p className="text-xs text-zinc-500">
+          Al conectar acept&aacute;s nuestros{" "}
+          <a href="/terminos" className="underline">
+            t&eacute;rminos
+          </a>{" "}
+          y la{" "}
+          <a href="/privacidad" className="underline">
+            pol&iacute;tica de privacidad
+          </a>
+          .
+        </p>
+      </BotonConectar>
     </Marco>
   );
 }
