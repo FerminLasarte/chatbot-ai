@@ -206,9 +206,32 @@ async def test_el_cliente_ve_su_nombre_y_los_datos_del_popup(
         "nombre_cliente": "Panaderia Lopez",
         "app_id": "APPID123",
         "config_id": "CONFIGID456",
-        "api_version": settings.whatsapp_api_version,
+        "api_version": settings.whatsapp_signup_api_version,
         "ya_conectado": False,
     }
+
+
+async def test_la_pagina_no_recibe_la_version_de_la_cloud_api(
+    cliente: AsyncClient, escenario: dict, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """★ Las dos versiones son cosas distintas y tienen que seguir separadas.
+
+    La del alta decide que asistente le dibuja Meta al cliente; la de la Cloud
+    API es contra que URL manda mensajes el servidor. Unificarlas -que es lo
+    natural al verlas casi iguales- ya rompio el alta una vez: con el SDK en
+    una version anterior a que coexistence existiera, Meta ignoraba el
+    featureType sin decir nada y abria el asistente equivocado, el de numero
+    nuevo, sin ningun error de por medio.
+
+    Se fuerzan valores distintos en vez de comparar los defaults: asi el test
+    sigue diciendo algo el dia que las dos versiones coincidan por casualidad.
+    """
+    monkeypatch.setattr(settings, "whatsapp_api_version", "v1.0")
+    monkeypatch.setattr(settings, "whatsapp_signup_api_version", "v99.0")
+
+    token = onboarding.emitir(escenario["a"].id).token
+    r = await cliente.get(f"/api/v1/onboarding/{token}")
+    assert r.json()["api_version"] == "v99.0"
 
 
 async def test_la_pagina_nunca_expone_el_app_secret(cliente: AsyncClient, escenario: dict) -> None:
