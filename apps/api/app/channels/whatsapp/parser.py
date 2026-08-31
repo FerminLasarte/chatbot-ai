@@ -86,10 +86,11 @@ def parse_echo(payload: dict) -> OutgoingEcho | None:
     if campo != CAMPO_ECHOES:
         return None
 
-    # Meta documenta la lista como `message_echoes`. Se acepta tambien
-    # `messages` porque es la unica variacion esperable mientras no haya un
-    # payload real a la vista, y equivocarse ahi significaria ignorar en
-    # silencio todos los mensajes manuales.
+    # La lista viene como `message_echoes`: confirmado contra un payload real de
+    # produccion el 2026-08-31, no solo contra la documentacion. Se sigue
+    # aceptando `messages` como respaldo porque no cuesta nada y el modo de
+    # fallar es caro: equivocarse ahi es ignorar en silencio todos los mensajes
+    # que el comercio escribe a mano.
     lista = value.get("message_echoes") or value.get("messages")
     if not isinstance(lista, list) or not lista:
         return None

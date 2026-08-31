@@ -55,11 +55,12 @@ PHONE_NUMBER_ID = "PHONE123"
 
 
 def _payload_echo(texto: str, *, wamid: str, clave_lista: str = "message_echoes") -> dict:
-    """La forma documentada del webhook `smb_message_echoes`.
+    """La forma real del webhook `smb_message_echoes`.
 
-    ★ NO esta verificada contra un evento real de Meta. Es la hipotesis que
-    implementa el parser; el dia que llegue el primero de produccion (queda
-    crudo en el log, ver `_recibir_echo`) hay que comparar y corregir los dos.
+    ★ VERIFICADA contra un evento de produccion el 2026-08-31: se capturo el
+    echo crudo del log y se paso por `parse_echo` tal cual. El payload real
+    trae ademas `contacts`, `to_user_id` y `user_id`, que el parser ignora por
+    leer campo por campo con `.get()`.
     """
     return {
         "object": "whatsapp_business_account",
