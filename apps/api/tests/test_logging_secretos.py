@@ -12,8 +12,13 @@ import logging
 
 from app.core.logging import JsonFormatter, tachar
 
-SECRETO = "35cb32e79efb2f87eff1dcedf6f794fd"
-CODE = "AQIjyRkSRgaCZuncM_FLFWnE5k85Jd6"
+# ★ Inventados y con pinta de inventados, a proposito. La primera version de
+# este test traia el App Secret de verdad -el del alta que estabamos
+# depurando-, y lo unico que hizo fue meter en el repo justo lo que el test
+# dice que no hay que filtrar. Lo encontro gitleaks en CI. Un valor de mentira
+# prueba exactamente lo mismo.
+SECRETO = "app-secret-de-mentira-para-el-test"
+CODE = "code-de-mentira-para-el-test"
 
 
 def _formatear(mensaje: str, *args: object) -> str:
