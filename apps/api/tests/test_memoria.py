@@ -106,7 +106,7 @@ async def test_el_segundo_turno_recibe_el_primero(
     db: AsyncSession, tenant: Tenant, espia: _LlmEspia
 ) -> None:
     """El caso concreto: "¿y el precio?" tiene que llegar con contexto."""
-    _, cid = await conv.answer(
+    _, cid, _deriva = await conv.answer(
         db, tenant, "tenes turno el martes?", channel="whatsapp", external_id="549110001"
     )
     await conv.answer(db, tenant, "y el precio?", channel="whatsapp", external_id="549110001")
@@ -171,7 +171,9 @@ async def test_el_orden_no_depende_de_los_limites_de_transaccion(
     Este test fija la garantia igual: el dia que alguien agrupe los inserts para
     ahorrar round-trips, el historial no se tiene que desordenar en silencio.
     """
-    _, cid = await conv.answer(db, tenant, "arranque", channel="whatsapp", external_id="549110020")
+    _, cid, _deriva = await conv.answer(
+        db, tenant, "arranque", channel="whatsapp", external_id="549110020"
+    )
 
     # Dos mensajes en UNA transaccion: created_at identico a proposito.
     base = await db.scalar(select(func.max(Message.position)).where(Message.conversation_id == cid))
@@ -291,7 +293,9 @@ async def test_tras_la_inactividad_se_abre_una_conversacion_nueva(
     db: AsyncSession, tenant: Tenant, espia: _LlmEspia
 ) -> None:
     """Sin esto, alguien que escribe meses despues reabre un hilo rancio."""
-    _, cid1 = await conv.answer(db, tenant, "hola", channel="whatsapp", external_id="549110007")
+    _, cid1, _deriva = await conv.answer(
+        db, tenant, "hola", channel="whatsapp", external_id="549110007"
+    )
 
     # Envejecemos la conversacion mas alla de la ventana.
     await db.execute(
@@ -301,7 +305,7 @@ async def test_tras_la_inactividad_se_abre_una_conversacion_nueva(
     )
     await db.commit()
 
-    _, cid2 = await conv.answer(
+    _, cid2, _deriva = await conv.answer(
         db, tenant, "hola de nuevo", channel="whatsapp", external_id="549110007"
     )
 
@@ -312,7 +316,9 @@ async def test_tras_la_inactividad_se_abre_una_conversacion_nueva(
 async def test_dentro_de_la_ventana_se_reanuda(
     db: AsyncSession, tenant: Tenant, espia: _LlmEspia
 ) -> None:
-    _, cid1 = await conv.answer(db, tenant, "hola", channel="whatsapp", external_id="549110008")
+    _, cid1, _deriva = await conv.answer(
+        db, tenant, "hola", channel="whatsapp", external_id="549110008"
+    )
     await db.execute(
         update(Conversation)
         .where(Conversation.id == cid1)
@@ -320,7 +326,9 @@ async def test_dentro_de_la_ventana_se_reanuda(
     )
     await db.commit()
 
-    _, cid2 = await conv.answer(db, tenant, "seguimos", channel="whatsapp", external_id="549110008")
+    _, cid2, _deriva = await conv.answer(
+        db, tenant, "seguimos", channel="whatsapp", external_id="549110008"
+    )
     assert cid2 == cid1
 
 
@@ -328,8 +336,10 @@ async def test_dos_usuarios_finales_no_comparten_hilo(
     db: AsyncSession, tenant: Tenant, espia: _LlmEspia
 ) -> None:
     """Dos clientes de la misma pyme, cada uno con su conversacion."""
-    _, cid_a = await conv.answer(db, tenant, "soy ana", channel="whatsapp", external_id="549110009")
-    _, cid_b = await conv.answer(
+    _, cid_a, _deriva = await conv.answer(
+        db, tenant, "soy ana", channel="whatsapp", external_id="549110009"
+    )
+    _, cid_b, _deriva = await conv.answer(
         db, tenant, "soy beto", channel="whatsapp", external_id="549110010"
     )
 
@@ -355,7 +365,7 @@ async def test_no_se_puede_reanudar_la_conversacion_de_otro_cliente(
     await db.commit()
     await db.refresh(otro)
     try:
-        _, cid_ajeno = await conv.answer(
+        _, cid_ajeno, _deriva = await conv.answer(
             db, otro, "datos privados de otro cliente", channel="webchat", external_id="x"
         )
 

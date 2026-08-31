@@ -193,6 +193,10 @@ export type Conversacion = {
    * rompe la regla de pureza de React.
    */
   en_modo_manual: boolean;
+  /** El asistente pidio que intervenga una persona, y hace cuanto. Sigue en
+   *  true aunque la pausa haya vencido: mientras nadie atienda, sigue pendiente. */
+  derivada: boolean;
+  minutos_desde_derivacion: number | null;
   minutos_inactiva: number;
   minutos_restantes: number | null;
   mensajes: number;

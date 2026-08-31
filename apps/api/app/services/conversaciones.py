@@ -64,6 +64,8 @@ def _to_read(c: Conversation, mensajes: int, ultimo: str | None) -> Conversation
         minutos_restantes=(
             _minutos(ahora, c.pausada_hasta) if manual and c.pausada_hasta else None
         ),
+        derivada=c.derivada_at is not None,
+        minutos_desde_derivacion=(_minutos(c.derivada_at, ahora) if c.derivada_at else None),
         mensajes=mensajes,
         ultimo_mensaje=_adelanto(ultimo),
     )
@@ -148,9 +150,16 @@ async def pausar(
 async def reanudar(
     db: AsyncSession, tenant_id: uuid.UUID, conversation_id: uuid.UUID
 ) -> ConversationRead:
-    """Devuelve la conversacion al bot antes de que venza la pausa."""
+    """Devuelve la conversacion al bot antes de que venza la pausa.
+
+    Tambien da por atendida la derivacion, si habia una: reactivar el asistente
+    a mano es exactamente la forma de decir "esto ya lo atendi yo". Es el unico
+    lugar donde la marca se limpia; que venza la pausa no alcanza, porque el
+    tiempo pasando no atiende a nadie.
+    """
     conversacion = await buscar(db, tenant_id, conversation_id)
     conversacion.pausada_hasta = None
+    conversacion.derivada_at = None
     await db.commit()
     await db.refresh(conversacion)
     return await detalle(db, conversacion)

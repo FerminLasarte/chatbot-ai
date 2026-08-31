@@ -23,7 +23,7 @@ async def chat(
     _: ChatKey,
 ) -> ChatResponse:
     """Acepta claves con scope `chat` (widget publico) o `tenant` (dashboard)."""
-    reply, conversation_id = await answer(
+    reply, conversation_id, derivada = await answer(
         db,
         tenant,
         payload.message,
@@ -33,4 +33,6 @@ async def chat(
         external_id=str(uuid.uuid4()),
         conversation_id=payload.conversation_id,
     )
-    return ChatResponse(reply=reply, conversation_id=str(conversation_id))
+    # `escalate` existia en el contrato desde el principio y siempre habia
+    # salido en False: hasta ahora nada podia ponerlo en True.
+    return ChatResponse(reply=reply, conversation_id=str(conversation_id), escalate=derivada)

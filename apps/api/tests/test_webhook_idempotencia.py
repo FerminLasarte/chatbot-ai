@@ -241,7 +241,7 @@ async def test_camino_feliz_marca_done_y_responde(
     tokens_usados: list[str] = []
 
     async def llm_ok(*args: object, **kwargs: object) -> tuple[str, uuid.UUID]:
-        return "Hola! Atendemos de 9 a 18.", uuid.uuid4()
+        return "Hola! Atendemos de 9 a 18.", uuid.uuid4(), False
 
     async def capturar_envio(
         *, to: str, text: str, phone_number_id: str, access_token: str
@@ -275,7 +275,7 @@ async def test_si_falla_el_envio_no_se_marca_como_done(
     """Generar la respuesta y no poder entregarla NO es un exito."""
 
     async def llm_ok(*args: object, **kwargs: object) -> tuple[str, uuid.UUID]:
-        return "respuesta que nunca llega", uuid.uuid4()
+        return "respuesta que nunca llega", uuid.uuid4(), False
 
     intentos: list[str] = []
 

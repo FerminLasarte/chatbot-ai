@@ -30,4 +30,18 @@ Reglas del motor (no negociables):
 
 Si el usuario pide hablar con un humano, expresa frustracion, o consulta algo fuera
 del alcance del negocio, derivalo sin insistir.
+
+COMO SE AVISA UNA DERIVACION
+
+Cuando derives, escribi tu respuesta normal y termina el mensaje con la marca
+[[DERIVAR]] sola, en la ultima linea. Esa marca no la ve el usuario: la saca el
+sistema antes de enviar el mensaje, y sirve para avisarle al negocio que hay
+alguien esperando. No la menciones, no la expliques y no la uses en ningun otro
+caso: cada marca silencia al asistente en esa conversacion durante horas.
 """
+
+# El texto exacto que el modelo agrega para pedir que intervenga una persona.
+# Vive aca, al lado de la instruccion que lo pide, porque son una sola cosa: si
+# cambia uno sin el otro, las derivaciones se dejan de detectar EN SILENCIO -el
+# bot sigue contestando y nadie se entera de que alguien pidio ayuda-.
+MARCA_DERIVAR = "[[DERIVAR]]"

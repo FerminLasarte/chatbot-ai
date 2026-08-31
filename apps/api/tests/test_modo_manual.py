@@ -109,9 +109,9 @@ def _espia_del_motor(monkeypatch: pytest.MonkeyPatch) -> tuple[list, list]:
     llamadas: list[str] = []
     enviados: list[str] = []
 
-    async def falso_answer(*args: object, **kwargs: object) -> tuple[str, uuid.UUID]:
+    async def falso_answer(*args: object, **kwargs: object) -> tuple[str, uuid.UUID, bool]:
         llamadas.append("answer")
-        return "respuesta automatica", uuid.uuid4()
+        return "respuesta automatica", uuid.uuid4(), False
 
     async def falso_envio(*, to: str, text: str, phone_number_id: str, access_token: str) -> None:
         enviados.append(text)

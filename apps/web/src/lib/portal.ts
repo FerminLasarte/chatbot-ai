@@ -28,6 +28,10 @@ export type ConversacionDelPortal = {
   /** Los tres derivados los calcula la API, que es la que tiene el reloj bien
    *  puesto. Ver la nota de `Conversacion` en lib/api.ts. */
   en_modo_manual: boolean;
+  /** El asistente pidio que intervenga una persona, y hace cuanto. Sigue en
+   *  true aunque la pausa haya vencido: mientras nadie atienda, sigue pendiente. */
+  derivada: boolean;
+  minutos_desde_derivacion: number | null;
   minutos_inactiva: number;
   minutos_restantes: number | null;
   mensajes: number;
