@@ -25,7 +25,7 @@ export function NavDelCliente({ id }: { id: string }) {
   const base = `/panel/${id}`;
 
   return (
-    <nav className="flex gap-1 overflow-x-auto lg:flex-col lg:overflow-visible">
+    <nav className="-mx-1 flex gap-1 overflow-x-auto lg:mx-0 lg:flex-col lg:overflow-visible">
       {SECCIONES.map(({ href, etiqueta }) => {
         const destino = `${base}${href}`;
         const activa = actual === destino;

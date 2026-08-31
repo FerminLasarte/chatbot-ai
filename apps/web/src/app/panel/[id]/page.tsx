@@ -1,6 +1,7 @@
 import { Bloque, Chip } from "@/components/ui";
 import { ListaDeConversaciones, cuantasEsperan, type ConversacionEnLista } from "@/components/conversaciones";
-import { listarConversaciones, listarIncidentes } from "@/lib/api";
+import { listarConversaciones, listarIncidentes, verUso, verWhatsApp } from "@/lib/api";
+import { Metrica, Metricas } from "@/components/metricas";
 import { claseCampoAngosto } from "@/components/ui";
 import { exigirPanel } from "../guardia";
 import { pausarBot, reanudarBot, traerHiloDelCliente } from "../acciones";
@@ -13,15 +14,45 @@ export default async function Conversaciones({ params }: { params: Promise<{ id:
   await exigirPanel();
   const { id } = await params;
 
-  const [conversaciones, incidentes] = await Promise.all([
+  const [conversaciones, incidentes, uso, wa] = await Promise.all([
     listarConversaciones(id),
     listarIncidentes(id),
+    verUso(id),
+    verWhatsApp(id),
   ]);
 
   const esperando = cuantasEsperan(conversaciones);
+  // "Activa" es lo que sigue vivo hoy: mas viejo que eso ya es historial y no
+  // dice nada sobre como viene el dia.
+  const activas = conversaciones.filter((c) => c.minutos_inactiva < 60 * 24).length;
 
   return (
     <>
+      <Metricas>
+        <Metrica
+          etiqueta="Conversaciones hoy"
+          valor={activas}
+          detalle={`${conversaciones.length} en total`}
+        />
+        <Metrica
+          etiqueta="Esperando una persona"
+          valor={esperando}
+          detalle={esperando > 0 ? "sin atender" : "nadie en espera"}
+          tono={esperando > 0 ? "alerta" : "neutro"}
+        />
+        <Metrica
+          etiqueta="Mensajes del mes"
+          valor={uso.messages}
+          detalle={uso.limit === null ? "sin tope" : `de ${uso.limit}`}
+        />
+        <Metrica
+          etiqueta="WhatsApp"
+          valor={wa.configurado ? "Conectado" : "Sin conectar"}
+          detalle={wa.configurado ? "el bot puede responder" : "el bot no puede responder"}
+          tono={wa.configurado ? "ok" : "alerta"}
+        />
+      </Metricas>
+
       <Incidentes incidentes={incidentes} />
 
       <Bloque

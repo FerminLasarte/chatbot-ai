@@ -102,6 +102,24 @@ body {
   font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
 }
 
+/* ★ En un monitor grande, todo un escalon mas grande.
+ *
+ * Tailwind mide en rem, asi que mover el tamanio base del documento sube texto,
+ * padding, alturas y separaciones a la vez y en proporcion: no hay que tocar
+ * ninguna pantalla. En una notebook queda exactamente como estaba; el problema
+ * era solo que en 27 pulgadas la misma interfaz se veia diminuta. */
+@media (min-width: 1536px) {
+  html {
+    font-size: 17px;
+  }
+}
+
+@media (min-width: 1920px) {
+  html {
+    font-size: 18px;
+  }
+}
+
 /* El foco por teclado se ve siempre y en el color del acento. Es la unica
  * pista que tiene alguien que no usa mouse para saber donde esta parado. */
 :focus-visible {

@@ -110,42 +110,47 @@ function Fila({
   }`;
 
   return (
-    <li className="flex items-start justify-between gap-3 py-3">
-      <span className="min-w-0 flex-1">
-        <span className="flex flex-wrap items-center gap-2">
-          <span className="truncate text-sm font-medium text-texto">{quien}</span>
-          {conversacion.derivada && (
-            <Chip tono="alerta">
-              Pidieron una persona
-              {conversacion.minutos_desde_derivacion !== null &&
-                ` · hace ${duracion(conversacion.minutos_desde_derivacion)}`}
-            </Chip>
-          )}
-          {conversacion.minutos_restantes !== null && (
-            <Chip>Lo atendés vos · vuelve en {duracion(conversacion.minutos_restantes)}</Chip>
-          )}
-        </span>
-
+    /* ★ En pantalla ancha la fila se lee como una tabla -quien, en que estado,
+       cuando- y no como un parrafo pegado a la izquierda con medio monitor
+       vacio al lado. En angosto vuelve a apilarse. */
+    <li className="-mx-2 flex flex-col gap-2 rounded-lg px-2 py-3 transition-colors hover:bg-superficie-2 lg:flex-row lg:items-center lg:gap-6">
+      <span className="min-w-0 lg:flex-1">
+        <span className="truncate text-sm font-medium text-texto">{quien}</span>
         {conversacion.ultimo_mensaje && (
-          <span className="mt-1 block truncate text-sm text-texto-suave">
+          <span className="mt-0.5 block truncate text-sm text-texto-suave">
             {conversacion.ultimo_mensaje}
           </span>
         )}
-
-        <span className="mt-1 block text-xs text-texto-tenue">
-          {cuantos} &middot; hace {duracion(conversacion.minutos_inactiva)}
-        </span>
       </span>
 
-      <VerConversacion
-        conversacionId={conversacion.id}
-        titulo={quien}
-        subtitulo={`${cuantos} · hace ${duracion(conversacion.minutos_inactiva)}`}
-        etiquetaPersona={etiquetaPersona}
-        traer={traer}
-      >
-        {acciones}
-      </VerConversacion>
+      <span className="flex flex-wrap items-center gap-2 lg:shrink-0">
+        {conversacion.derivada && (
+          <Chip tono="alerta">
+            Pidieron una persona
+            {conversacion.minutos_desde_derivacion !== null &&
+              ` · hace ${duracion(conversacion.minutos_desde_derivacion)}`}
+          </Chip>
+        )}
+        {conversacion.minutos_restantes !== null && (
+          <Chip>Lo atendés vos · vuelve en {duracion(conversacion.minutos_restantes)}</Chip>
+        )}
+      </span>
+
+      <span className="flex items-center justify-between gap-3 lg:w-72 lg:shrink-0 lg:justify-end">
+        <span className="text-xs whitespace-nowrap text-texto-tenue">
+          {cuantos} &middot; hace {duracion(conversacion.minutos_inactiva)}
+        </span>
+
+        <VerConversacion
+          conversacionId={conversacion.id}
+          titulo={quien}
+          subtitulo={`${cuantos} · hace ${duracion(conversacion.minutos_inactiva)}`}
+          etiquetaPersona={etiquetaPersona}
+          traer={traer}
+        >
+          {acciones}
+        </VerConversacion>
+      </span>
     </li>
   );
 }
