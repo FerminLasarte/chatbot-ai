@@ -13,8 +13,10 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Chatbot AI — demo",
-  description: "Subi un documento y probá el chatbot.",
+  // Lo ve el cliente final en la pestania del navegador cuando abre su portal,
+  // asi que no puede seguir diciendo "demo".
+  title: { default: "ArgencoreAI", template: "%s · ArgencoreAI" },
+  description: "Asistente de WhatsApp para tu negocio.",
 };
 
 export default function RootLayout({
@@ -27,7 +29,7 @@ export default function RootLayout({
       lang="es"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="flex min-h-full flex-col bg-fondo text-texto">{children}</body>
     </html>
   );
 }

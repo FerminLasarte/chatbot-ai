@@ -1,26 +1,110 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/* Sistema visual del producto.
+ *
+ * ★ POR QUE TOKENS Y NO `zinc-800` SUELTO EN CADA PANTALLA
+ * Las paginas venian escribiendo el color a mano, y el resultado fue que el
+ * mismo boton terminara con dos grises distintos segun quien lo hubiera
+ * copiado. Un token le pone nombre a la INTENCION -esto es una superficie,
+ * esto es texto secundario, esto pide una accion- y el modo oscuro se resuelve
+ * una vez, aca, en vez de con un `dark:` pegado a cada clase.
+ *
+ * La paleta es neutra con un solo acento: mucho blanco, grises calidos, y azul
+ * unicamente en lo que se puede tocar. Es lo que hace que en una pantalla densa
+ * el ojo encuentre solo la accion.
+ */
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+:root {
+  /* Superficies, de atras hacia adelante. */
+  --fondo: #fbfbfa;
+  --superficie: #ffffff;
+  --superficie-2: #f4f4f2;
+  --borde: #e7e5e2;
+  --borde-fuerte: #d6d3ce;
+
+  /* Texto. `suave` es para lo que acompania: fechas, contadores, ayudas. */
+  --texto: #1c1917;
+  --texto-suave: #78716c;
+  --texto-tenue: #a8a29e;
+
+  /* El acento. Un azul sobrio, tomado del logo. Cambiar estas tres lineas
+   * recolorea todo lo accionable del producto. */
+  --acento: #2563eb;
+  --acento-fuerte: #1d4ed8;
+  --acento-suave: #eff5ff;
+
+  /* Estados. `alerta` es "esto pide que alguien haga algo" -una derivacion
+   * esperando-, distinto de `error`, que es "algo salio mal". */
+  --alerta: #a16207;
+  --alerta-suave: #fefce8;
+  --error: #b91c1c;
+  --error-suave: #fef2f2;
+  --ok: #15803d;
+  --ok-suave: #f0fdf4;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --fondo: #191918;
+    --superficie: #212120;
+    --superficie-2: #2a2a28;
+    --borde: #333331;
+    --borde-fuerte: #45443f;
+
+    --texto: #ededec;
+    --texto-suave: #a1a09b;
+    --texto-tenue: #78776f;
+
+    --acento: #6098f5;
+    --acento-fuerte: #8ab4f8;
+    --acento-suave: #17233a;
+
+    --alerta: #e3b341;
+    --alerta-suave: #2a2416;
+    --error: #f98a8a;
+    --error-suave: #2d1a1a;
+    --ok: #7ee2a8;
+    --ok-suave: #172a1f;
   }
 }
 
+@theme inline {
+  --color-fondo: var(--fondo);
+  --color-superficie: var(--superficie);
+  --color-superficie-2: var(--superficie-2);
+  --color-borde: var(--borde);
+  --color-borde-fuerte: var(--borde-fuerte);
+
+  --color-texto: var(--texto);
+  --color-texto-suave: var(--texto-suave);
+  --color-texto-tenue: var(--texto-tenue);
+
+  --color-acento: var(--acento);
+  --color-acento-fuerte: var(--acento-fuerte);
+  --color-acento-suave: var(--acento-suave);
+
+  --color-alerta: var(--alerta);
+  --color-alerta-suave: var(--alerta-suave);
+  --color-error: var(--error);
+  --color-error-suave: var(--error-suave);
+  --color-ok: var(--ok);
+  --color-ok-suave: var(--ok-suave);
+
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--fondo);
+  color: var(--texto);
+  /* ★ Aca habia un `font-family: Arial` que pisaba la fuente: el proyecto
+   * descargaba Geist en cada visita y despues mostraba todo en Arial. */
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+/* El foco por teclado se ve siempre y en el color del acento. Es la unica
+ * pista que tiene alguien que no usa mouse para saber donde esta parado. */
+:focus-visible {
+  outline: 2px solid var(--acento);
+  outline-offset: 2px;
 }

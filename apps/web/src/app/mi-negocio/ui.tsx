@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 
+import { Aviso, claseBoton } from "@/components/ui";
 import type { EstadoPortal } from "./acciones";
 
 // UI propia del portal, separada de panel/ui.tsx a proposito.
@@ -22,37 +23,12 @@ export function Boton({
   children: React.ReactNode;
   variante?: "normal" | "suave";
 }) {
-  const estilos = {
-    normal:
-      "bg-zinc-900 text-white hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300",
-    suave:
-      "border border-zinc-300 text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800",
-  }[variante];
-
+  // La apariencia sale de components/ui.tsx: lo que se comparte es como se ve
+  // un boton, no el tipo de estado de cada lado. Ver la nota de arriba.
   return (
-    <button
-      type="submit"
-      className={`rounded-md px-3 py-2 text-sm font-medium transition-colors disabled:opacity-40 ${estilos}`}
-    >
+    <button type="submit" className={claseBoton(variante === "suave" ? "suave" : "principal")}>
       {children}
     </button>
-  );
-}
-
-function Aviso({ estado }: { estado: EstadoPortal }) {
-  if (!estado.error && !estado.ok) return null;
-  const esError = Boolean(estado.error);
-  return (
-    <p
-      role="status"
-      className={`mt-2 rounded-md px-3 py-2 text-sm ${
-        esError
-          ? "bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300"
-          : "bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-300"
-      }`}
-    >
-      {estado.error ?? estado.ok}
-    </p>
   );
 }
 
@@ -76,7 +52,7 @@ export function FormularioPortal({
   return (
     <form action={ejecutar} className={className}>
       {children}
-      <Aviso estado={estado} />
+      <Aviso error={estado.error} ok={estado.ok} className="mt-2" />
     </form>
   );
 }
