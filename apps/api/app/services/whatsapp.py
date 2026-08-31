@@ -131,6 +131,7 @@ async def conectar_desde_signup(
     # 5. Recien aca se toca la fila del cliente.
     guardar_token(tenant, token)
     tenant.whatsapp_phone_number_id = phone_number_id
+    tenant.whatsapp_waba_id = waba_id
     await db.commit()
 
     return Alta(phone_number_id=phone_number_id, advertencia=advertencia)

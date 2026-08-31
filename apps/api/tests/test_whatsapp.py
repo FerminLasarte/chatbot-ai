@@ -281,6 +281,9 @@ async def test_configurar_whatsapp_y_leer_el_estado(cliente: AsyncClient, escena
     assert r.status_code == 200
     assert r.json() == {
         "phone_number_id": "1234567890",
+        # La carga a mano no tiene de donde sacar la WABA: solo la trae el alta
+        # por link.
+        "waba_id": None,
         "tiene_token": True,
         "configurado": True,
     }

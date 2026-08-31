@@ -221,6 +221,7 @@ async def read_whatsapp(tenant_id: uuid.UUID, db: DbSession, _: AdminKey) -> Wha
     tenant = await _tenant_o_404(db, tenant_id)
     return WhatsAppRead(
         phone_number_id=tenant.whatsapp_phone_number_id,
+        waba_id=tenant.whatsapp_waba_id,
         # Se informa SI hay token, nunca cual: el panel solo necesita saber si
         # falta cargarlo.
         tiene_token=bool(tenant.whatsapp_access_token_cifrado),
@@ -268,6 +269,7 @@ async def update_whatsapp(
     await db.refresh(tenant)
     return WhatsAppRead(
         phone_number_id=tenant.whatsapp_phone_number_id,
+        waba_id=tenant.whatsapp_waba_id,
         tiene_token=bool(tenant.whatsapp_access_token_cifrado),
         configurado=whatsapp.tiene_whatsapp(tenant),
     )

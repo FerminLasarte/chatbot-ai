@@ -285,6 +285,9 @@ async def test_el_alta_completa_deja_al_cliente_listo_para_recibir(
 
     await db.refresh(a)
     assert a.whatsapp_phone_number_id == "PNID1"
+    # El waba_id no se usa para operar, pero es lo unico que permite encontrar
+    # despues la cuenta del cliente del lado de Meta.
+    assert a.whatsapp_waba_id == "WABA1"
     assert whatsapp.leer_token(a) == "EAAG-token-permanente"
     assert whatsapp.tiene_whatsapp(a)
 

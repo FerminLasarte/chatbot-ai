@@ -190,6 +190,31 @@ export default async function Cliente({ params }: { params: Promise<{ id: string
             )}
           </p>
 
+          {/* Los dos ids que identifican al cliente del lado de Meta. Estan a la
+              vista, y no plegados con la carga a mano, porque son lo primero
+              que hay que buscar cuando Meta rechaza algo: sin el WABA ID hay
+              que ir a rastrear la cuenta al Business Manager a ojo. */}
+          {(wa.phone_number_id || wa.waba_id) && (
+            <dl className="mb-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs text-zinc-500">
+              {wa.phone_number_id && (
+                <>
+                  <dt>Phone number ID</dt>
+                  <dd className="font-mono break-all text-zinc-700 dark:text-zinc-300">
+                    {wa.phone_number_id}
+                  </dd>
+                </>
+              )}
+              <dt>WABA ID</dt>
+              <dd className="font-mono break-all text-zinc-700 dark:text-zinc-300">
+                {wa.waba_id ?? (
+                  <span className="font-sans text-zinc-400">
+                    sin guardar (alta anterior o carga a mano)
+                  </span>
+                )}
+              </dd>
+            </dl>
+          )}
+
           <FormularioLink
             accion={generarLinkOnboarding}
             tenantId={id}

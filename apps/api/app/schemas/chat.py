@@ -80,6 +80,9 @@ class WhatsAppRead(BaseModel):
     """Estado del canal. NUNCA devuelve el token, ni siquiera parcial."""
 
     phone_number_id: str | None
+    # La WABA del cliente del lado de Meta. Solo lectura: la completa el alta
+    # automatica, no hay forma de cargarla a mano desde el panel.
+    waba_id: str | None
     tiene_token: bool
     configurado: bool
 
