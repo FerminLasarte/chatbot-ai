@@ -120,6 +120,9 @@ export const verUso = (id: string) => pedir<Uso>(`/tenants/${id}/usage`);
 
 export type WhatsApp = {
   phone_number_id: string | null;
+  /** La WABA del cliente del lado de Meta. La completa el alta por link; en los
+   *  clientes conectados a mano queda en null y no hay forma de cargarla. */
+  waba_id: string | null;
   tiene_token: boolean;
   configurado: boolean;
 };

@@ -37,6 +37,13 @@ class Tenant(Base):
     # autoriza a enviar mensajes en nombre de SU numero, asi que no puede vivir
     # en la config global ni compartirse entre clientes.
     whatsapp_access_token_cifrado: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # La WABA (WhatsApp Business Account) que Meta le creo al cliente durante el
+    # alta. No se usa para operar -el envio va por phone_number_id-, se guarda
+    # para poder identificar la cuenta del cliente del lado de Meta cuando algo
+    # falla. Sin esto hay que ir a buscarla a mano al Business Manager.
+    # Sin unique: una misma WABA puede tener varios numeros, y nada impide que
+    # dos clientes nuestros cuelguen del mismo negocio.
+    whatsapp_waba_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     settings_json: Mapped[dict] = mapped_column(JSONB, default=dict)
     is_active: Mapped[bool] = mapped_column(default=True)
 
