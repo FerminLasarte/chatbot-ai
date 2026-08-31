@@ -80,6 +80,18 @@ class Alta:
     advertencia: str | None = None
 
 
+# Lo que contesta Meta al intentar registrar un numero que vino por
+# coexistence: "Register endpoint is not available for SMB businesses." Se
+# compara por el pedazo estable del mensaje y no por el codigo de error, que es
+# el generico 100 y lo comparte con media docena de fallas distintas.
+_RECHAZO_ESPERABLE = "not available for smb"
+
+
+def _es_alta_de_coexistence(exc: Exception) -> bool:
+    """El registro fallo porque el numero ya vive en la app del celular."""
+    return _RECHAZO_ESPERABLE in str(exc).lower()
+
+
 async def conectar_desde_signup(
     db: AsyncSession, tenant: Tenant, *, code: str, waba_id: str, phone_number_id: str
 ) -> Alta:
@@ -121,12 +133,23 @@ async def conectar_desde_signup(
     try:
         await client.registrar_numero(phone_number_id, token, pin_de_registro(tenant.id))
     except (client.AltaWhatsAppError, RetryableHTTPError) as exc:
-        logger.warning("no se pudo registrar el numero del cliente %s: %s", tenant.id, exc)
-        advertencia = (
-            "El numero quedo conectado, pero Meta no acepto registrarlo automaticamente. "
-            "Suele pasar cuando el numero ya tenia verificacion en dos pasos. "
-            "Avisale a quien te paso el link antes de empezar a usarlo."
-        )
+        if _es_alta_de_coexistence(exc):
+            # No es un fallo: el numero venia de la app WhatsApp Business y ya
+            # quedo registrado por ese vinculo. Meta rechaza el endpoint aposta.
+            # Sin esta rama, un alta perfecta termina con un cartel que manda al
+            # cliente a buscar una verificacion en dos pasos que no existe.
+            logger.info(
+                "el numero del cliente %s viene de la app WhatsApp Business: "
+                "no hace falta registrarlo",
+                tenant.id,
+            )
+        else:
+            logger.warning("no se pudo registrar el numero del cliente %s: %s", tenant.id, exc)
+            advertencia = (
+                "El numero quedo conectado, pero Meta no acepto registrarlo automaticamente. "
+                "Suele pasar cuando el numero ya tenia verificacion en dos pasos. "
+                "Avisale a quien te paso el link antes de empezar a usarlo."
+            )
 
     # 5. Recien aca se toca la fila del cliente.
     guardar_token(tenant, token)
