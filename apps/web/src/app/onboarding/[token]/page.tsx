@@ -12,8 +12,8 @@ export const metadata = {
 
 function Marco({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-screen flex-1 items-center justify-center bg-zinc-50 px-4 py-10 dark:bg-black">
-      <div className="w-full max-w-md rounded-lg border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-950">
+    <div className="flex min-h-screen flex-1 items-center justify-center px-4 py-10">
+      <div className="w-full max-w-md rounded-lg border border-borde bg-superficie p-6">
         {children}
       </div>
     </div>
@@ -36,10 +36,10 @@ export default async function Onboarding({ params }: { params: Promise<{ token: 
         : "No se pudo abrir esta pagina. Proba de nuevo en un rato.";
     return (
       <Marco>
-        <h1 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+        <h1 className="text-lg font-semibold text-texto">
           Este link no se puede usar
         </h1>
-        <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">{mensaje}</p>
+        <p className="mt-2 text-sm text-texto-suave">{mensaje}</p>
       </Marco>
     );
   }
@@ -47,7 +47,7 @@ export default async function Onboarding({ params }: { params: Promise<{ token: 
   if (estado.ya_conectado) {
     return (
       <Marco>
-        <h1 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+        <h1 className="text-lg font-semibold text-texto">
           {estado.nombre_cliente}
         </h1>
         <p className="mt-2 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700 dark:bg-green-950 dark:text-green-300">
@@ -59,12 +59,12 @@ export default async function Onboarding({ params }: { params: Promise<{ token: 
 
   return (
     <Marco>
-      <h1 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+      <h1 className="text-lg font-semibold text-texto">
         Conect&aacute; tu WhatsApp
       </h1>
-      <p className="mt-1 text-sm text-zinc-500">{estado.nombre_cliente}</p>
+      <p className="mt-1 text-sm text-texto-suave">{estado.nombre_cliente}</p>
 
-      <p className="mt-4 text-sm text-zinc-600 dark:text-zinc-400">
+      <p className="mt-4 text-sm text-texto-suave">
         Al tocar el bot&oacute;n se abre una ventana de Facebook. Ah&iacute; entr&aacute;s con la
         cuenta de tu negocio y eleg&iacute;s el n&uacute;mero de tel&eacute;fono que va a usar el
         asistente. Son un par de minutos y no hace falta configurar nada m&aacute;s.
@@ -75,7 +75,7 @@ export default async function Onboarding({ params }: { params: Promise<{ token: 
           un QR) va en la opcion que corresponde, adentro de BotonConectar: una
           instruccion suelta aca arriba que contradiga a la opcion elegida es
           peor que no ponerla. */}
-      <ul className="mt-4 mb-5 list-disc space-y-1 pl-5 text-sm text-zinc-500">
+      <ul className="mt-4 mb-5 list-disc space-y-1 pl-5 text-sm text-texto-suave">
         <li>Ten&eacute; el tel&eacute;fono a mano: te va a pedir confirmar el n&uacute;mero.</li>
         <li>No cierres la ventana hasta que termine.</li>
       </ul>
@@ -90,7 +90,7 @@ export default async function Onboarding({ params }: { params: Promise<{ token: 
             eleccion del numero. Meta mira esta pantalla en la revision de la
             app, y ademas es lo justo: antes de conectar su WhatsApp el cliente
             tiene que poder leer que hacemos con los datos. */}
-        <p className="text-xs text-zinc-500">
+        <p className="text-xs text-texto-suave">
           Al conectar acept&aacute;s nuestros{" "}
           <a href="/terminos" className="underline">
             t&eacute;rminos

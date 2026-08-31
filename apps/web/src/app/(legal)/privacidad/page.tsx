@@ -9,7 +9,7 @@ export default function Privacidad() {
   return (
     <>
       <h1>Politica de privacidad</h1>
-      <p className="text-zinc-500">
+      <p className="text-texto-suave">
         Como tratamos los datos personales en el asistente de WhatsApp de {EMPRESA.nombreComercial}.
       </p>
 

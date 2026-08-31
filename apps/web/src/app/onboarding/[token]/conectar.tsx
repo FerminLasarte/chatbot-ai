@@ -360,7 +360,7 @@ export function BotonConectar({
           llama el flujo del lado de Meta: "coexistence" no le dice nada a nadie
           fuera de esta oficina. */}
       <fieldset className="flex flex-col gap-2" disabled={estado.paso === "conectando"}>
-        <legend className="mb-1 text-sm font-medium text-zinc-900 dark:text-zinc-100">
+        <legend className="mb-1 text-sm font-medium text-texto">
           &iquest;Qu&eacute; n&uacute;mero vas a usar?
         </legend>
 
@@ -453,8 +453,8 @@ function Opcion({
     <label
       className={`flex cursor-pointer gap-3 rounded-md border p-3 transition-colors ${
         activo
-          ? "border-[#1877F2] bg-blue-50 dark:bg-blue-950/40"
-          : "border-zinc-200 hover:border-zinc-300 dark:border-zinc-800 dark:hover:border-zinc-700"
+          ? "border-acento bg-acento-suave"
+          : "border-borde hover:border-borde-fuerte"
       }`}
     >
       <input
@@ -463,11 +463,11 @@ function Opcion({
         value={valor}
         checked={activo}
         onChange={() => alElegir(valor)}
-        className="mt-1 accent-[#1877F2]"
+        className="mt-1 accent-acento"
       />
       <span className="flex flex-col gap-0.5">
-        <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{titulo}</span>
-        <span className="text-xs text-zinc-600 dark:text-zinc-400">{detalle}</span>
+        <span className="text-sm font-medium text-texto">{titulo}</span>
+        <span className="text-xs text-texto-suave">{detalle}</span>
       </span>
     </label>
   );

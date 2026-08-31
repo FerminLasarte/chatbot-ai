@@ -2,24 +2,16 @@
 
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 
+import { PanelLateral } from "@/components/panel-lateral";
 import { duracion } from "@/lib/duracion";
 
-// El hilo de una conversacion, en un panel que entra desde la derecha.
+// El hilo de una conversacion: los mensajes y quien escribio cada uno.
 //
-// POR QUE UN PANEL Y NO UNA PAGINA
-// --------------------------------
-// Quien mira esto casi siempre esta comparando: "de estas cinco conversaciones,
-// cual es la que salio mal". Una pagina aparte obliga a ir y volver, y en cada
-// vuelta hay que reencontrar donde estaba. El panel deja la lista a la vista y
-// convierte esa comparacion en un par de clics. En un telefono no hay lista que
-// preservar, asi que ocupa toda la pantalla.
-//
-// POR QUE VIVE EN /components Y NO EN LA CARPETA DE UNA RUTA
-// ----------------------------------------------------------
-// Lo usan las dos puertas: el duenio del negocio en /mi-negocio y la agencia en
-// /panel. Es el mismo hilo y tiene que verse igual; lo unico que cambia es de
-// donde salen los datos -cada ruta pasa su propia funcion, con su propia
-// credencial- y como se nombra al que contesto a mano.
+// El panel que lo contiene vive en components/panel-lateral.tsx. Aca queda solo
+// lo propio de una conversacion, que es lo que hace que las dos puertas -el
+// portal del cliente y el panel de la agencia- muestren exactamente lo mismo.
+// Lo unico que cambia entre ellas es de donde salen los datos (cada ruta pasa
+// su funcion, con su credencial) y como se nombra a quien contesto a mano.
 
 /** Un mensaje ya listo para mostrar. Es el `MessageRead` de la API. */
 export type MensajeDelHilo = {
@@ -63,19 +55,7 @@ export function VerConversacion({
   children?: React.ReactNode;
 }) {
   const [estado, setEstado] = useState<Estado>({ paso: "cerrado" });
-  // Separado de `estado` a proposito: la animacion de entrada necesita un frame
-  // con el panel ya montado pero todavia corrido.
-  const [entrando, setEntrando] = useState(false);
-  const fondo = useRef<HTMLDivElement>(null);
-  const cerrar1 = useRef<HTMLButtonElement>(null);
   const cuerpo = useRef<HTMLDivElement>(null);
-
-  const abierto = estado.paso !== "cerrado";
-
-  const cerrar = useCallback(() => {
-    setEntrando(false);
-    setEstado({ paso: "cerrado" });
-  }, []);
 
   // ★ La accion de servidor va dentro de una transicion, como pide la guia de
   // Next para invocarlas fuera de un <form>. Ademas es lo correcto de por si:
@@ -95,34 +75,10 @@ export function VerConversacion({
     });
   }, [conversacionId, traer]);
 
-  // Escape cierra, y mientras el panel esta abierto la pagina de atras no
-  // scrollea: sin esto, en el telefono el dedo mueve la lista en vez del hilo.
-  useEffect(() => {
-    if (!abierto) return;
-
-    const alTeclear = (e: KeyboardEvent) => {
-      if (e.key === "Escape") cerrar();
-    };
-    window.addEventListener("keydown", alTeclear);
-
-    const overflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
-    const id = window.setTimeout(() => {
-      setEntrando(true);
-      cerrar1.current?.focus();
-    }, 10);
-
-    return () => {
-      window.removeEventListener("keydown", alTeclear);
-      document.body.style.overflow = overflow;
-      clearTimeout(id);
-    };
-  }, [abierto, cerrar]);
+  const cerrar = useCallback(() => setEstado({ paso: "cerrado" }), []);
 
   // Un hilo se abre por el final, como cualquier chat: lo ultimo que se dijo es
-  // lo que se vino a leer. Sin esto, en una conversacion de meses hay que
-  // scrollear hasta abajo cada vez.
+  // lo que se vino a leer.
   useEffect(() => {
     if (estado.paso !== "listo" || !cuerpo.current) return;
     cuerpo.current.scrollTop = cuerpo.current.scrollHeight;
@@ -138,78 +94,36 @@ export function VerConversacion({
         Ver conversaci&oacute;n
       </button>
 
-      {abierto && (
-        <div className="fixed inset-0 z-50">
-          {/* ★ El velo es HERMANO del panel, no su padre. Anidado, el
-              `backdrop-blur` del velo alcanza tambien al contenido del panel y
-              el hilo se lee borroso: backdrop-filter afecta a todo lo que se
-              pinta encima dentro de su contexto. Se vio en la primera prueba. */}
-          <div
-            ref={fondo}
-            onClick={cerrar}
-            className={`absolute inset-0 bg-black/20 backdrop-blur-[2px] transition-opacity duration-200 motion-reduce:transition-none ${
-              entrando ? "opacity-100" : "opacity-0"
-            }`}
-          />
-          <aside
-            role="dialog"
-            aria-modal="true"
-            aria-label={`Conversacion con ${titulo}`}
-            className={`absolute inset-y-0 right-0 flex w-full flex-col border-borde bg-superficie shadow-2xl transition-transform duration-200 ease-out motion-reduce:transition-none sm:max-w-md sm:border-l ${
-              entrando ? "translate-x-0" : "translate-x-full"
-            }`}
-          >
-            {/* Encabezado fijo: con el hilo scrolleado sigue diciendo con quien
-                se esta hablando, que es justo lo que uno pierde de vista. */}
-            <header className="flex items-start justify-between gap-3 border-b border-borde px-5 py-4">
-              <div className="min-w-0">
-                <h2 className="truncate text-sm font-medium text-texto">
-                  {titulo}
-                </h2>
-                <p className="mt-0.5 text-xs text-texto-suave">{subtitulo}</p>
-              </div>
-              <button
-                ref={cerrar1}
-                type="button"
-                onClick={cerrar}
-                aria-label="Cerrar"
-                className="-mr-2 -mt-1 rounded-md px-2 py-1 text-lg leading-none text-texto-tenue transition-colors hover:bg-superficie-2 hover:text-texto"
-              >
-                &times;
-              </button>
-            </header>
+      <PanelLateral
+        abierto={estado.paso !== "cerrado"}
+        titulo={titulo}
+        subtitulo={subtitulo}
+        alCerrar={cerrar}
+        pie={children}
+      >
+        <div ref={cuerpo} className="flex-1 overflow-y-auto overscroll-contain px-5 py-4">
+          {estado.paso === "cargando" && <Esqueleto />}
 
-            <div ref={cuerpo} className="flex-1 overflow-y-auto overscroll-contain px-5 py-4">
-              {estado.paso === "cargando" && <Esqueleto />}
+          {estado.paso === "error" && (
+            <p className="rounded-lg bg-error-suave px-3 py-2 text-sm text-error">
+              {estado.mensaje}
+            </p>
+          )}
 
-              {estado.paso === "error" && (
-                <p className="rounded-md bg-error-suave px-3 py-2 text-sm text-error">
-                  {estado.mensaje}
-                </p>
-              )}
-
-              {estado.paso === "listo" &&
-                (estado.mensajes.length === 0 ? (
-                  <p className="text-sm text-texto-suave">
-                    Esta conversaci&oacute;n todav&iacute;a no tiene mensajes.
-                  </p>
-                ) : (
-                  <ol className="flex flex-col gap-3">
-                    {estado.mensajes.map((m) => (
-                      <Mensaje key={m.id} mensaje={m} etiquetaPersona={etiquetaPersona} />
-                    ))}
-                  </ol>
+          {estado.paso === "listo" &&
+            (estado.mensajes.length === 0 ? (
+              <p className="text-sm text-texto-suave">
+                Esta conversaci&oacute;n todav&iacute;a no tiene mensajes.
+              </p>
+            ) : (
+              <ol className="flex flex-col gap-3">
+                {estado.mensajes.map((m) => (
+                  <Mensaje key={m.id} mensaje={m} etiquetaPersona={etiquetaPersona} />
                 ))}
-            </div>
-
-            {children && (
-              <footer className="border-t border-borde px-5 py-4">
-                {children}
-              </footer>
-            )}
-          </aside>
+              </ol>
+            ))}
         </div>
-      )}
+      </PanelLateral>
     </>
   );
 }

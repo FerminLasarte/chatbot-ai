@@ -13,7 +13,7 @@ export default function EliminarDatos() {
   return (
     <>
       <h1>Como eliminar tus datos</h1>
-      <p className="text-zinc-500">
+      <p className="text-texto-suave">
         Instrucciones para pedir la eliminacion de los datos tratados por el asistente de WhatsApp
         de {EMPRESA.nombreComercial}.
       </p>

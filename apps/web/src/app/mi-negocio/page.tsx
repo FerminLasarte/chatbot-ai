@@ -1,14 +1,12 @@
-import {
-  AccesoRevocado,
-  listarMisConversaciones,
-  verMiNegocio,
-  type ConversacionDelPortal,
-} from "@/lib/portal";
+import { AccesoRevocado, listarMisConversaciones, verMiNegocio } from "@/lib/portal";
 import { claveDelPortal } from "@/lib/sesion-portal";
-import { Bloque, Chip, Vacio, claseCampoAngosto } from "@/components/ui";
-import { duracion } from "@/lib/duracion";
+import { Bloque, Chip, claseCampoAngosto } from "@/components/ui";
+import {
+  ListaDeConversaciones,
+  cuantasEsperan,
+  type ConversacionEnLista,
+} from "@/components/conversaciones";
 import { pausarBot, reanudarBot, traerMiHilo } from "./acciones";
-import { VerConversacion } from "@/components/hilo";
 import { Boton, FormularioPortal } from "./ui";
 
 // Esta pagina la abre el duenio de la PyME, no la agencia. Junto con
@@ -104,12 +102,7 @@ export default async function MiNegocio({
     );
   }
 
-  // Las que esperan una persona, arriba de todo; el resto conserva el orden que
-  // manda la API (la ultima actividad primero).
-  const ordenadas = [...conversaciones].sort(
-    (a, b) => Number(b.derivada) - Number(a.derivada),
-  );
-  const esperando = conversaciones.filter((c) => c.derivada).length;
+  const esperando = cuantasEsperan(conversaciones);
 
   return (
     <Marco>
@@ -135,15 +128,13 @@ export default async function MiNegocio({
           ) : null
         }
       >
-        {conversaciones.length === 0 ? (
-          <Vacio>Todavía no te escribió nadie. Cuando lo hagan, van a aparecer acá.</Vacio>
-        ) : (
-          <ul className="-my-1 flex flex-col divide-y divide-borde">
-            {ordenadas.map((c) => (
-              <Hilo key={c.id} conversacion={c} />
-            ))}
-          </ul>
-        )}
+        <ListaDeConversaciones
+          conversaciones={conversaciones}
+          etiquetaPersona="Vos"
+          traer={traerMiHilo}
+          vacio="Todavía no te escribió nadie. Cuando lo hagan, van a aparecer acá."
+          acciones={(c) => <AccionesDelHilo conversacion={c} />}
+        />
       </Bloque>
 
       <p className="text-xs text-texto-tenue">
@@ -155,79 +146,34 @@ export default async function MiNegocio({
   );
 }
 
-/** Una fila de la lista: quien escribio, en que estado quedo y como entrar.
+/** Lo que se puede hacer con una conversacion, al pie de su panel.
  *
- * ★ Las acciones (pausar, reactivar) NO viven aca sino al pie del panel de la
- * conversacion. En una lista de veinte hilos, veinte desplegables de horas y
- * veinte botones son ruido que tapa lo unico que importa a simple vista: quien
- * esta esperando. La accion vive donde uno ya esta mirando de que se trata.
+ * ★ Solo va el id. La credencial sale de la cookie dentro de la accion, nunca
+ * de un campo del formulario: una Server Action es un endpoint HTTP y cualquiera
+ * puede mandarle el FormData que quiera. Ver la nota de acciones.ts.
  */
-function Hilo({ conversacion }: { conversacion: ConversacionDelPortal }) {
-  const esWhatsApp = conversacion.channel === "whatsapp";
-  const quien = esWhatsApp ? `+${conversacion.external_id}` : conversacion.external_id;
+function AccionesDelHilo({ conversacion }: { conversacion: ConversacionEnLista }) {
+  if (conversacion.en_modo_manual) {
+    return (
+      <FormularioPortal accion={reanudarBot}>
+        <input type="hidden" name="conversacion_id" value={conversacion.id} />
+        <Boton>Que vuelva a responder el asistente</Boton>
+      </FormularioPortal>
+    );
+  }
 
   return (
-    <li className="flex items-start justify-between gap-3 py-3">
-      <span className="min-w-0 flex-1">
-        <span className="flex flex-wrap items-center gap-2">
-          <span className="truncate text-sm font-medium text-texto">{quien}</span>
-          {conversacion.derivada && (
-            <Chip tono="alerta">
-              Pidieron una persona
-              {conversacion.minutos_desde_derivacion !== null &&
-                ` · hace ${duracion(conversacion.minutos_desde_derivacion)}`}
-            </Chip>
-          )}
-          {conversacion.minutos_restantes !== null && (
-            <Chip>Lo atendés vos · vuelve en {duracion(conversacion.minutos_restantes)}</Chip>
-          )}
-        </span>
-
-        {conversacion.ultimo_mensaje && (
-          <span className="mt-1 block truncate text-sm text-texto-suave">
-            {conversacion.ultimo_mensaje}
-          </span>
-        )}
-
-        <span className="mt-1 block text-xs text-texto-tenue">
-          {conversacion.mensajes} {conversacion.mensajes === 1 ? "mensaje" : "mensajes"}
-          {" · hace "}
-          {duracion(conversacion.minutos_inactiva)}
-        </span>
-      </span>
-
-      <VerConversacion
-        conversacionId={conversacion.id}
-        titulo={quien}
-        subtitulo={`${conversacion.mensajes} ${
-          conversacion.mensajes === 1 ? "mensaje" : "mensajes"
-        } · hace ${duracion(conversacion.minutos_inactiva)}`}
-        etiquetaPersona="Vos"
-        traer={traerMiHilo}
-      >
-        {/* ★ Solo va el id de la conversacion. La credencial sale de la cookie
-            dentro de la accion, nunca de un campo del formulario. Ver la nota
-            de acciones.ts. */}
-        {conversacion.en_modo_manual ? (
-          <FormularioPortal accion={reanudarBot}>
-            <input type="hidden" name="conversacion_id" value={conversacion.id} />
-            <Boton>Que vuelva a responder el asistente</Boton>
-          </FormularioPortal>
-        ) : (
-          <FormularioPortal accion={pausarBot}>
-            <input type="hidden" name="conversacion_id" value={conversacion.id} />
-            <div className="flex flex-wrap items-center gap-2">
-              <select name="horas" defaultValue="8" className={claseCampoAngosto}>
-                <option value="1">1 hora</option>
-                <option value="4">4 horas</option>
-                <option value="8">8 horas</option>
-                <option value="24">24 horas</option>
-              </select>
-              <Boton variante="suave">Pausar el asistente</Boton>
-            </div>
-          </FormularioPortal>
-        )}
-      </VerConversacion>
-    </li>
+    <FormularioPortal accion={pausarBot}>
+      <input type="hidden" name="conversacion_id" value={conversacion.id} />
+      <div className="flex flex-wrap items-center gap-2">
+        <select name="horas" defaultValue="8" className={claseCampoAngosto}>
+          <option value="1">1 hora</option>
+          <option value="4">4 horas</option>
+          <option value="8">8 horas</option>
+          <option value="24">24 horas</option>
+        </select>
+        <Boton variante="suave">Pausar el asistente</Boton>
+      </div>
+    </FormularioPortal>
   );
 }

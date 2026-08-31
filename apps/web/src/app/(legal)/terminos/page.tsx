@@ -9,7 +9,7 @@ export default function Terminos() {
   return (
     <>
       <h1>Terminos del servicio</h1>
-      <p className="text-zinc-500">
+      <p className="text-texto-suave">
         Condiciones bajo las que {EMPRESA.nombreComercial} presta el servicio de asistente por
         WhatsApp.
       </p>
