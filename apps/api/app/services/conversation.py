@@ -26,6 +26,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.llm.client import complete
+from app.ai.prompts.base_system import MARCA_DERIVAR
 from app.ai.prompts.builder import build_system_blocks, build_user_turn
 from app.ai.rag.retriever import search
 from app.core.config import settings
@@ -41,6 +42,25 @@ ROL_ASISTENTE = "assistant"
 AUTOR_BOT = "bot"
 AUTOR_PERSONA = "persona"
 
+# Lo que se manda si el modelo contesta SOLO con la marca de derivacion y no
+# queda texto para el cliente. Pasa poco, pero mandar un mensaje vacio -o peor,
+# no mandar nada- deja a alguien que acaba de pedir ayuda mirando la pantalla.
+DERIVACION_SIN_TEXTO = "Te derivo con alguien del negocio. En un rato te responden."
+
+
+def separar_derivacion(texto: str) -> tuple[str, bool]:
+    """Saca la marca de derivacion y dice si estaba.
+
+    Se quitan TODAS las apariciones y no solo la del final: el modelo a veces la
+    pone en otro lado, y una marca que se escapa al chat se lee como un error
+    del negocio -es lo unico de este mecanismo que el cliente final no tiene por
+    que ver nunca-.
+    """
+    if MARCA_DERIVAR not in texto:
+        return texto, False
+    limpio = texto.replace(MARCA_DERIVAR, "").strip()
+    return limpio or DERIVACION_SIN_TEXTO, True
+
 
 class ConversacionAjena(Exception):
     """El conversation_id pedido no pertenece a este cliente."""
@@ -54,8 +74,13 @@ async def answer(
     channel: str,
     external_id: str,
     conversation_id: uuid.UUID | None = None,
-) -> tuple[str, uuid.UUID]:
-    """Responde un mensaje entrante y devuelve (respuesta, conversation_id).
+) -> tuple[str, uuid.UUID, bool]:
+    """Responde un mensaje entrante.
+
+    Devuelve (respuesta, conversation_id, derivada). `derivada` es True cuando el
+    asistente pidio que intervenga una persona: en ese caso la conversacion ya
+    quedo marcada y pausada, y lo unico que falta hacer con el dato es
+    contarselo a quien llamo.
 
     Levanta `quota.QuotaExcedida` si el cliente agoto su cuota del mes, y
     `ConversacionAjena` si el conversation_id no es de este cliente.
@@ -79,8 +104,23 @@ async def answer(
 
     respuesta = await complete(build_system_blocks(tenant.system_prompt), messages)
 
-    await _guardar_mensaje(db, conversacion.id, ROL_ASISTENTE, respuesta.text, AUTOR_BOT)
+    texto, deriva = separar_derivacion(respuesta.text)
+
+    await _guardar_mensaje(db, conversacion.id, ROL_ASISTENTE, texto, AUTOR_BOT)
     await _tocar_actividad(db, conversacion)
+
+    if deriva:
+        # Se anota cuando se pidio la persona y se calla al bot, con el mismo
+        # vencimiento que la pausa manual: si nadie atiende, en unas horas el
+        # asistente vuelve a contestar. Silencio indefinido es peor que un bot
+        # respondiendo tarde (ver el comentario de `pausada_hasta`).
+        ahora = datetime.now(UTC)
+        conversacion.derivada_at = ahora
+        conversacion.pausada_hasta = ahora + timedelta(hours=settings.manual_mode_hours)
+        logger.info(
+            "el asistente derivo la conversacion a una persona",
+            extra={"tenant_id": str(tenant.id), "conversation_id": str(conversacion.id)},
+        )
 
     await quota.registrar_tokens(
         db,
@@ -89,7 +129,7 @@ async def answer(
         output_tokens=respuesta.output_tokens,
         cache_read_tokens=respuesta.cache_read_tokens,
     )
-    return respuesta.text, conversacion.id
+    return texto, conversacion.id, deriva
 
 
 async def resolver_conversacion(

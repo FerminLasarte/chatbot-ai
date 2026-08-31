@@ -282,7 +282,7 @@ async def _handle(
             token = whatsapp.leer_token(tenant)
 
             try:
-                reply, _conversacion = await answer(
+                reply, _conversacion, _derivada = await answer(
                     db,
                     tenant,
                     text,

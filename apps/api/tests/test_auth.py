@@ -277,7 +277,7 @@ async def test_admin_emite_una_clave_y_el_secreto_se_muestra_una_vez(
     # Sirve de verdad contra /chat. Cortamos antes del LLM: lo que se prueba aca
     # es la autenticacion, no el motor.
     async def respuesta_fija(*args: object, **kwargs: object) -> tuple[str, uuid.UUID]:
-        return "hola!", uuid.uuid4()
+        return "hola!", uuid.uuid4(), False
 
     monkeypatch.setattr(chat_route, "answer", respuesta_fija)
     r2 = await cliente.post("/api/v1/chat", headers=_auth(emitida), json={"message": "hola"})

@@ -154,6 +154,19 @@ function Hilo({ conversacion }: { conversacion: ConversacionDelPortal }) {
           <span className="block truncate text-sm text-zinc-900 dark:text-zinc-100">
             {esWhatsApp ? `+${conversacion.external_id}` : conversacion.external_id}
           </span>
+
+          {/* Va arriba y a la izquierda, antes que el adelanto del mensaje: es
+              lo unico de esta fila que pide una accion, y quien barre la lista
+              lo hace leyendo la columna izquierda de arriba abajo. */}
+          {conversacion.derivada && (
+            <span className="my-1 inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-900 dark:bg-amber-950 dark:text-amber-200">
+              <span className="size-1.5 rounded-full bg-amber-500" />
+              Pidieron una persona
+              {conversacion.minutos_desde_derivacion !== null &&
+                ` · hace ${duracion(conversacion.minutos_desde_derivacion)}`}
+            </span>
+          )}
+
           {conversacion.ultimo_mensaje && (
             <span className="block truncate text-xs text-zinc-500">
               {conversacion.ultimo_mensaje}

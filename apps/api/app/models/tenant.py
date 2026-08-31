@@ -138,6 +138,17 @@ class Conversation(Base):
     # vuelva unas horas mas tarde de lo ideal.
     pausada_hasta: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
+    # Cuando el asistente derivo esta conversacion a una persona, si lo hizo.
+    #
+    # Es fecha y no booleano por lo mismo que arriba, pero al reves: aca lo que
+    # importa es CUANTO HACE que alguien esta esperando. "Pidio una persona hace
+    # 3 h" y "hace 2 min" piden cosas distintas de quien mira la lista.
+    #
+    # No se limpia sola al vencer la pausa: si nadie atendio, el pedido sigue sin
+    # atender y la lista tiene que seguir diciendolo. Se limpia cuando una
+    # persona reanuda el bot a mano, que es la forma de decir "ya lo atendi".
+    derivada_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
     # Mismo motivo que Tenant.documents.
     messages: Mapped[list["Message"]] = relationship(
         back_populates="conversation", passive_deletes=True

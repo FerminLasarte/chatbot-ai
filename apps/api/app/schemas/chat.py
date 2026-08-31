@@ -107,6 +107,11 @@ class ConversationRead(BaseModel):
     en_modo_manual: bool
     minutos_inactiva: int
     minutos_restantes: int | None
+    # El asistente pidio que intervenga una persona, y hace cuanto. Sigue en
+    # True aunque la pausa ya haya vencido: mientras nadie la atienda, el pedido
+    # esta sin atender y la lista tiene que decirlo.
+    derivada: bool
+    minutos_desde_derivacion: int | None
     mensajes: int
     ultimo_mensaje: str | None
 
