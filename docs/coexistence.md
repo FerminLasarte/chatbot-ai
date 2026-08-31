@@ -1,8 +1,13 @@
 # Coexistence: el comercio contesta a mano y el bot sigue andando
 
-Estado: **codigo implementado y apagado por defecto** (`COEXISTENCE_ENABLED=false`).
-Falta la configuracion del lado de Meta. Lo que queda por hacer esta al final,
-en "Como prenderlo".
+Estado: **PRENDIDO en produccion desde el 2026-08-31**
+(`COEXISTENCE_ENABLED=true` en el servicio `api` de Railway), verificado de
+punta a punta con el numero de Argencore. Lo que se comprobo contra produccion
+esta en "Como quedo", al final.
+
+★ Antes de dar de alta un cliente nuevo por coexistence, leer "La trampa de los
+mensajes automaticos": es la unica configuracion del lado del comercio que hay
+que tocar, y si se pasa por alto deja al bot mudo sin que nadie se entere.
 
 Tres de las dudas que bloqueaban esto quedaron resueltas contra la
 documentacion oficial de Meta (consultada el 2026-08-18, ver Fuentes):
@@ -141,82 +146,64 @@ construccion.
 
 Tests: `apps/api/tests/test_coexistence.py` (32 casos).
 
-## Lo que falta
+## La trampa de los mensajes automaticos
 
-### 1. Configuracion en el Meta App Dashboard (no es codigo)
+La app WhatsApp Business tiene mensaje de bienvenida y mensaje de ausencia, y
+los manda sola. Para Meta son mensajes salientes del comercio como cualquier
+otro, asi que **generan echo**. Con coexistence prendido, ese saludo automatico
+hace exactamente lo que hace una respuesta a mano: pausa el bot 8 horas.
 
-Suscribir el WABA a los **tres** campos: `smb_message_echoes`, `history` y
-`smb_app_state_sync`. Meta los pide todos para coexistence, aunque el codigo
-solo actua sobre el primero.
+El modo de fallar es el peor posible. Entra un cliente nuevo, la app le manda el
+saludo, el bot se calla, y nadie se entera hasta que el cliente se queja. Se
+detecto el 2026-08-31 leyendo los echoes crudos ANTES de prender la variable: el
+segundo echo que llego decia "Gracias por comunicarte con Argencore Solutions.
+En unos minutos un asesor respondera tu consulta".
 
-★ RESUELTO EN CODIGO (2026-08-26). Lo que abre el asistente de coexistence no
-es una opcion del dashboard sino el `featureType` del `FB.login`, en
-`apps/web/src/app/onboarding/[token]/conectar.tsx`. Iba en `""` para todos, que
-es el asistente estandar: a un comercio que venia a conectar SU numero, Meta le
-ofrecia dar de alta un numero virtual nuevo, sin ninguna opcion de usar el
-propio. Ahora el link pregunta cual de los dos caminos quiere y manda
-`whatsapp_business_app_onboarding` o `""` segun la respuesta. El valor viejo
-`coexistence` ya no existe del lado de Meta.
+**En cada alta por coexistence hay que apagarlos** en el celular del comercio:
+Ajustes -> Herramientas para la empresa -> Mensaje de bienvenida y Mensaje de
+ausencia. No hay forma de distinguirlos en el payload: para Meta son iguales a
+un mensaje escrito a mano.
 
-Los tres campos: `smb_message_echoes` (el unico que usa el codigo), mas
-`history` y `smb_app_state_sync`. Estos dos ultimos el webhook los ignora
-callado a proposito (`CAMPOS_CONOCIDOS_SIN_USO`): el backfill de `history` son
-hasta 180 dias de chats, y avisar por cada uno dejaria el log inservible justo
-durante el alta.
+## Como quedo (verificado en produccion el 2026-08-31)
 
-RESUELTO: no hace falta un `config_id` propio. Sirve el que ya esta en
-`settings.whatsapp_config_id`.
+**El payload es el que asumia el parser.** El echo real se paso por `parse_echo`
+tal cual salio del log: devuelve el `to_number`, el texto, el `phone_number_id`
+y el wamid, y `parse_incoming` lo ignora. La forma tiene campos de mas que la
+hipotesis (`contacts`, `to_user_id`, `user_id`) y no molestan porque el parser
+lee con `.get()`. No hubo que corregir nada.
 
-### 2. Confirmar el payload contra un evento real
+**La Cloud API NO hace echo de lo que manda el bot.** Es la duda que mas
+preocupaba, porque el bot pausandose con su propia respuesta lo dejaba mudo para
+siempre. Con la funcion prendida y trafico real no aparecio ni una vez
+`echo identico a la ultima respuesta del bot`. Las dos defensas quedan igual,
+como seguro barato.
 
-La forma ya esta confirmada contra la documentacion (arriba), asi que esto pasa
-de ser un bloqueante a ser una verificacion. Mandar un mensaje a mano desde el
-celular y buscar en el log de Railway:
+**La pausa funciona.** En el log de una prueba real, en orden: dos mensajes
+entrantes contestados por el bot; despues
+`respuesta manual desde el celular: bot pausado en esta conversacion`; y a
+partir de ahi `conversacion en modo manual: mensaje guardado sin responder` por
+cada mensaje del cliente. Cada respuesta manual corre el vencimiento.
 
-    echo de coexistence recibido con la funcion apagada: {...}
+**El registro del numero falla, y esta bien.** Meta contesta
+`Register endpoint is not available for SMB businesses`: un numero que viene de
+la app ya quedo registrado por ese vinculo. El alta lo reconoce y no lo reporta
+como advertencia (ver `_es_alta_de_coexistence` en `services/whatsapp.py`).
 
-Comparar ese JSON con `_payload_echo` en `tests/test_coexistence.py`, que es la
-hipotesis que implementa el parser. Si difiere, corregir los dos.
-
-En la misma prueba conviene confirmar lo que dice la documentacion sobre la
-Cloud API: mandar un mensaje CON el bot y verificar que NO aparece un segundo
-log de echo con esa respuesta. Si apareciera, la documentacion estaria
-desactualizada y las dos defensas pasarian de seguro a mecanismo principal.
-
-### 3. Onboarding (`apps/web/src/app/onboarding/` + `apps/api/.../onboarding`)
-
-HECHO (2026-08-26). El link ya no asume un solo camino: pregunta si el numero es
-el que ya se usa en la app WhatsApp Business o si es uno nuevo, y de ahi sale el
-`featureType`. La pregunta no tiene default a proposito — los dos caminos son
-irreversibles para el cliente y ninguno es el "normal".
-
-Sigue en pie que el alta por coexistence **requiere el celular del duenio en la
-mano** (escanea un QR), asi que el link conviene abrirlo desde el celular o al
-lado de la persona.
-
-Ver `apps/api/app/services/whatsapp.py:113` (canje -> suscripcion -> registro).
-`registrar_numero` ya contempla el caso de migrar un numero que venia de la app.
-
-## Como prenderlo
-
-1. Configurar el lado de Meta (punto 1) en un numero de prueba.
-2. Confirmar el payload con el log (punto 2) y corregir el parser si difiere.
-3. `COEXISTENCE_ENABLED=true` en las variables de Railway. No hay que tocar
-   codigo ni migrar nada.
-4. Mirar el log por un dia. Si aparece
-   `echo identico a la ultima respuesta del bot`, la defensa por id no esta
-   funcionando y hay que revisarla antes de sumar mas clientes.
-
-Para apagarlo, la variable vuelve a `false` y el bot ignora los echoes al toque.
+**Para apagarlo**, `COEXISTENCE_ENABLED=false` en Railway: el bot vuelve a
+ignorar los echoes al toque y nada mas cambia.
 
 ## Dudas que quedan abiertas
 
-1. Si somos -o podemos ser- Solution Partner o Tech Provider. Es el requisito
-   que puede frenar todo el plan, y no depende del codigo.
-2. Si los tenants ya dados de alta con el Embedded Signup estandar pueden sumar
+Las dos primeras de la lista original ya no lo son: somos Tech Provider
+(aprobado el 2026-08-18) y el payload quedo confirmado contra produccion.
+
+1. Si los tenants ya dados de alta con el Embedded Signup estandar pueden sumar
    coexistence sobre el mismo numero, o si hay que re-onboardearlos.
-3. Si Meta cuenta la antiguedad desde el uso del WhatsApp comun o desde la
+2. Si Meta cuenta la antiguedad desde el uso del WhatsApp comun o desde la
    conversion a WhatsApp Business app. Afecta a un comercio que recien convierte.
+3. Cuanto tarda en la practica el backfill de `history` y si conviene pedirlo:
+   en el alta de Argencore se acepto compartir hasta 6 meses de chats, y el
+   webhook los ignora callado.
 
 ## Fuentes
 
