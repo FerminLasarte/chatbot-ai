@@ -166,6 +166,17 @@ class Message(Base):
     # le da al modelo un dialogo que nunca ocurrio.
     position: Mapped[int] = mapped_column(Integer)
     role: Mapped[str] = mapped_column(String(16))
+    # Quien escribio un mensaje con rol `assistant`: el bot o una persona del
+    # comercio desde la app del celular (coexistence). El rol no alcanza para
+    # distinguirlos y esta bien que no alcance -para el cliente final las dos
+    # cosas son "me contesto el negocio", y el modelo tiene que leerlas igual-,
+    # pero para el duenio la diferencia es todo: sin esto, la vista de la
+    # conversacion le atribuye al bot lo que escribio el mismo, y auditar al
+    # asistente se vuelve imposible.
+    #
+    # NULL = no se sabe: son los mensajes anteriores a esta columna. Se muestran
+    # sin atribuir en vez de inventarles un autor.
+    autor: Mapped[str | None] = mapped_column(String(16), nullable=True)
     content: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

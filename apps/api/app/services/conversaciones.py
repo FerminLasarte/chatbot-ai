@@ -23,7 +23,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.tenant import Conversation, Message
-from app.schemas.chat import ConversationRead
+from app.schemas.chat import ConversationRead, MessageRead
 
 # Largo del adelanto del ultimo mensaje. Alcanza para reconocer de que se venia
 # hablando; el resto seria volcar la conversacion entera en una lista.
@@ -154,3 +154,40 @@ async def reanudar(
     await db.commit()
     await db.refresh(conversacion)
     return await detalle(db, conversacion)
+
+
+async def listar_mensajes(
+    db: AsyncSession, tenant_id: uuid.UUID, conversation_id: uuid.UUID, *, limite: int
+) -> list[MessageRead]:
+    """El hilo completo de una conversacion, del mas viejo al mas nuevo.
+
+    ★ Pasa por `buscar`, igual que pausar y reanudar, y no por una consulta
+    propia. Es lo unico que impide que alguien lea las conversaciones de otro
+    negocio mandando un id ajeno: el filtro por tenant tiene que estar en el
+    camino, no en la buena fe de quien llama.
+
+    Cuando la conversacion es mas larga que `limite` se devuelven los ULTIMOS
+    mensajes, que es lo que alguien quiere ver al abrir un hilo. Se piden al
+    reves y se dan vuelta en memoria: pedirlos en orden obligaria a contar
+    primero para saber desde donde.
+    """
+    await buscar(db, tenant_id, conversation_id)
+
+    filas = await db.scalars(
+        select(Message)
+        .where(Message.conversation_id == conversation_id)
+        .order_by(Message.position.desc())
+        .limit(limite)
+    )
+    ahora = datetime.now(UTC)
+    return [
+        MessageRead(
+            id=str(m.id),
+            role=m.role,
+            autor=m.autor,
+            content=m.content,
+            created_at=m.created_at,
+            minutos=_minutos(m.created_at, ahora),
+        )
+        for m in reversed(filas.all())
+    ]

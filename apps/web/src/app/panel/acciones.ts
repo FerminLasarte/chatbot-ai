@@ -268,3 +268,28 @@ export async function revocarClave(_estado: Estado, form: FormData): Promise<Est
   revalidatePath(`/panel/${id}`);
   return { ok: "Clave revocada." };
 }
+
+
+/** Lo que el navegador recibe al abrir una conversacion: el hilo, o un motivo. */
+export type HiloCargado = { mensajes?: api.Mensaje[]; error?: string };
+
+/**
+ * El hilo de una conversacion de un cliente, para dar soporte sin pedirle
+ * capturas.
+ *
+ * El tenantId viene del navegador y esta bien que asi sea: la sesion del panel
+ * ya da acceso a todos los clientes, asi que no hay nada que un tenantId
+ * elegido a mano pueda abrir que la persona no pudiera abrir navegando. Lo que
+ * no puede faltar es la sesion.
+ */
+export async function traerHiloDelCliente(
+  id: string,
+  conversacionId: string,
+): Promise<HiloCargado> {
+  await exigirSesion();
+  try {
+    return { mensajes: await api.verConversacion(id, conversacionId) };
+  } catch {
+    return { error: "No se pudo abrir la conversacion." };
+  }
+}

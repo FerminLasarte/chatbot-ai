@@ -37,6 +37,10 @@ logger = logging.getLogger(__name__)
 ROL_USUARIO = "user"
 ROL_ASISTENTE = "assistant"
 
+# Quien escribio un mensaje del asistente. Ver el comentario de `Message.autor`.
+AUTOR_BOT = "bot"
+AUTOR_PERSONA = "persona"
+
 
 class ConversacionAjena(Exception):
     """El conversation_id pedido no pertenece a este cliente."""
@@ -75,7 +79,7 @@ async def answer(
 
     respuesta = await complete(build_system_blocks(tenant.system_prompt), messages)
 
-    await _guardar_mensaje(db, conversacion.id, ROL_ASISTENTE, respuesta.text)
+    await _guardar_mensaje(db, conversacion.id, ROL_ASISTENTE, respuesta.text, AUTOR_BOT)
     await _tocar_actividad(db, conversacion)
 
     await quota.registrar_tokens(
@@ -118,7 +122,7 @@ async def registrar_saliente(db: AsyncSession, conversacion: Conversation, texto
     respondio. Cuando la pausa venza y el bot retome, la historia que ve el
     modelo tiene lo que dijo la persona en vez de un agujero.
     """
-    await _guardar_mensaje(db, conversacion.id, ROL_ASISTENTE, texto)
+    await _guardar_mensaje(db, conversacion.id, ROL_ASISTENTE, texto, AUTOR_PERSONA)
     await _tocar_actividad(db, conversacion)
 
 
@@ -277,7 +281,11 @@ async def _cargar_historia(db: AsyncSession, conversation_id: uuid.UUID) -> list
 
 
 async def _guardar_mensaje(
-    db: AsyncSession, conversation_id: uuid.UUID, role: str, content: str
+    db: AsyncSession,
+    conversation_id: uuid.UUID,
+    role: str,
+    content: str,
+    autor: str | None = None,
 ) -> None:
     """La posicion se calcula en la misma sentencia del INSERT.
 
@@ -295,6 +303,7 @@ async def _guardar_mensaje(
             position=siguiente,
             role=role,
             content=content,
+            autor=autor,
         )
     )
     await db.commit()

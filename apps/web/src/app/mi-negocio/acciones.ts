@@ -2,7 +2,13 @@
 
 import { revalidatePath } from "next/cache";
 
-import { AccesoRevocado, pausarMiBot, reanudarMiBot } from "@/lib/portal";
+import {
+  AccesoRevocado,
+  pausarMiBot,
+  reanudarMiBot,
+  verMiConversacion,
+  type MensajeDelHilo,
+} from "@/lib/portal";
 import { claveDelPortal } from "@/lib/sesion-portal";
 
 export type EstadoPortal = { error?: string; ok?: string };
@@ -64,4 +70,30 @@ export async function reanudarBot(_estado: EstadoPortal, form: FormData): Promis
 
   revalidatePath("/mi-negocio");
   return { ok: "El bot vuelve a responder en esta conversacion." };
+}
+
+
+/** Lo que el navegador recibe al abrir una conversacion: el hilo, o un motivo. */
+export type HiloCargado = { mensajes?: MensajeDelHilo[]; error?: string };
+
+/**
+ * El hilo de una conversacion, para el panel que se abre al tocarla.
+ *
+ * ★ Se pide al abrir y no junto con la lista a proposito. Traer todos los
+ * mensajes de todas las conversaciones para mostrar una es tirar a la basura la
+ * mayoria, y en un negocio con meses de historial eso se nota. Ademas la
+ * credencial vive en la cookie y nunca viaja al navegador: la unica forma de
+ * pedir un hilo desde el cliente es esta accion, que la resuelve del lado del
+ * servidor y valida contra la API que la conversacion sea de este negocio.
+ */
+export async function traerMiHilo(conversacionId: string): Promise<HiloCargado> {
+  const clave = await claveDelPortal();
+  if (!clave) return { error: SIN_ACCESO };
+
+  try {
+    return { mensajes: await verMiConversacion(clave, conversacionId) };
+  } catch (e) {
+    if (e instanceof AccesoRevocado) return { error: SIN_ACCESO };
+    return { error: "No pudimos abrir esta conversacion. Proba de nuevo en un rato." };
+  }
 }

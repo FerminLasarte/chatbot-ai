@@ -7,7 +7,8 @@ import {
 import { claveDelPortal } from "@/lib/sesion-portal";
 import { claseCampoAngosto } from "@/lib/estilos";
 import { duracion } from "@/lib/duracion";
-import { pausarBot, reanudarBot } from "./acciones";
+import { pausarBot, reanudarBot, traerMiHilo } from "./acciones";
+import { VerConversacion } from "@/components/hilo";
 import { Boton, FormularioPortal } from "./ui";
 
 // Esta pagina la abre el duenio de la PyME, no la agencia. Junto con
@@ -164,12 +165,25 @@ function Hilo({ conversacion }: { conversacion: ConversacionDelPortal }) {
           </span>
         </span>
 
-        {conversacion.minutos_restantes !== null && (
-          <span className="text-xs text-amber-700 dark:text-amber-400">
-            Lo atend&eacute;s vos &mdash; el asistente vuelve en{" "}
-            {duracion(conversacion.minutos_restantes)}
-          </span>
-        )}
+        <span className="flex shrink-0 flex-col items-end gap-1">
+          {conversacion.minutos_restantes !== null && (
+            <span className="text-xs text-amber-700 dark:text-amber-400">
+              Lo atend&eacute;s vos &mdash; el asistente vuelve en{" "}
+              {duracion(conversacion.minutos_restantes)}
+            </span>
+          )}
+          {/* "Vos" y no "A mano": del lado del duenio del negocio, la persona
+              que contesto desde el celular es el mismo. */}
+          <VerConversacion
+            conversacionId={conversacion.id}
+            titulo={esWhatsApp ? `+${conversacion.external_id}` : conversacion.external_id}
+            subtitulo={`${conversacion.mensajes} ${
+              conversacion.mensajes === 1 ? "mensaje" : "mensajes"
+            } · hace ${duracion(conversacion.minutos_inactiva)}`}
+            etiquetaPersona="Vos"
+            traer={traerMiHilo}
+          />
+        </span>
       </div>
 
       {/* ★ Solo va el id de la conversacion. La credencial sale de la cookie
