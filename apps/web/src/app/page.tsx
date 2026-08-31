@@ -1,5 +1,7 @@
 "use client";
 
+import { claseBoton, claseCampo } from "@/components/ui";
+
 import { FormEvent, useRef, useState } from "react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -98,30 +100,30 @@ export default function Home() {
   }
 
   return (
-    <div className="flex flex-1 flex-col items-center bg-zinc-50 px-4 py-10 dark:bg-black">
+    <div className="flex flex-1 flex-col items-center px-4 py-10">
       <div className="flex w-full max-w-2xl flex-col gap-6">
         <header>
-          <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-50">
+          <h1 className="text-2xl font-semibold text-texto">
             Chatbot AI — demo
           </h1>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">
+          <p className="text-sm text-texto-suave">
             Subi un documento y pregunt&aacute;le lo que quieras.
           </p>
         </header>
 
         {sinClave && (
-          <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
+          <div className="rounded-lg bg-alerta-suave p-4 text-sm text-alerta">
             Falta <code>NEXT_PUBLIC_API_KEY</code> en <code>apps/web/.env.local</code>. Corr&eacute;:
-            <pre className="mt-2 overflow-x-auto rounded bg-black/10 p-2 dark:bg-white/10">
+            <pre className="mt-2 overflow-x-auto rounded bg-superficie-2 p-2">
               cd apps/api &amp;&amp; uv run python -m app.cli crear-tenant-demo
             </pre>
             y reinici&aacute; el servidor de Next.js.
           </div>
         )}
 
-        <section className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
-          <label className="flex cursor-pointer flex-col items-center gap-2 rounded-md border-2 border-dashed border-zinc-300 p-6 text-center hover:border-zinc-400 dark:border-zinc-700 dark:hover:border-zinc-600">
-            <span className="text-sm text-zinc-600 dark:text-zinc-300">
+        <section className="rounded-xl border border-borde bg-superficie p-5">
+          <label className="flex cursor-pointer flex-col items-center gap-2 rounded-md border-2 border-dashed border-borde-fuerte p-6 text-center transition-colors hover:border-acento">
+            <span className="text-sm text-texto-suave">
               {documento.tipo === "vacio" && "Hacé click para elegir un PDF, .txt o .md"}
               {documento.tipo === "subiendo" && `Subiendo ${documento.nombre}...`}
               {documento.tipo === "listo" &&
@@ -141,10 +143,10 @@ export default function Home() {
           </label>
         </section>
 
-        <section className="flex min-h-96 flex-col rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
+        <section className="flex min-h-96 flex-col rounded-xl border border-borde bg-superficie">
           <div className="flex flex-1 flex-col gap-3 overflow-y-auto p-4">
             {mensajes.length === 0 && (
-              <p className="m-auto text-sm text-zinc-400">
+              <p className="m-auto text-sm text-texto-tenue">
                 Sin mensajes todav&iacute;a. Escrib&iacute; algo abajo.
               </p>
             )}
@@ -153,31 +155,31 @@ export default function Home() {
                 key={i}
                 className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${
                   m.rol === "user"
-                    ? "self-end bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
-                    : "self-start bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100"
+                    ? "self-end bg-acento-suave text-texto"
+                    : "self-start bg-superficie-2 text-texto"
                 }`}
               >
                 {m.texto}
               </div>
             ))}
-            {enviando && <p className="self-start text-sm text-zinc-400">escribiendo...</p>}
+            {enviando && <p className="self-start text-sm text-texto-tenue">escribiendo...</p>}
           </div>
 
           <form
             onSubmit={enviarPregunta}
-            className="flex gap-2 border-t border-zinc-200 p-3 dark:border-zinc-800"
+            className="flex gap-2 border-t border-borde p-3"
           >
             <input
               value={pregunta}
               onChange={(e) => setPregunta(e.target.value)}
               placeholder="Escribí tu pregunta..."
               disabled={sinClave}
-              className="flex-1 rounded-md border border-zinc-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-zinc-500 dark:border-zinc-700"
+              className={claseCampo}
             />
             <button
               type="submit"
               disabled={sinClave || enviando || !pregunta.trim()}
-              className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-40 dark:bg-zinc-100 dark:text-zinc-900"
+              className={claseBoton()}
             >
               Enviar
             </button>

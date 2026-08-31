@@ -7,7 +7,7 @@
  * mirando. Ver el comentario de `Conversacion` en lib/api.ts.
  *
  * Sin "use client" a proposito: lo usan paginas de servidor. Ver la nota de
- * lib/estilos.ts sobre por que eso importa.
+ * components/ui.tsx sobre por que eso importa.
  */
 export function duracion(minutos: number): string {
   if (minutos < 60) return `${minutos} min`;
