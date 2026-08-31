@@ -111,6 +111,27 @@ class ConversationRead(BaseModel):
     ultimo_mensaje: str | None
 
 
+class MessageRead(BaseModel):
+    """Un mensaje dentro de una conversacion, para mostrarlo en el hilo.
+
+    `role` dice de que lado va (el cliente final o el negocio) y `autor` quien
+    escribio los del negocio: el bot o una persona desde el celular. Van
+    separados a proposito: el rol es lo que ve el modelo y no puede cambiar, y
+    el autor es informacion nueva que puede faltar en los mensajes viejos.
+    """
+
+    id: str
+    role: str
+    # "bot" | "persona" | None. None son los mensajes anteriores a que se
+    # empezara a anotar: se muestran sin atribuir, no se les inventa un autor.
+    autor: str | None
+    content: str
+    created_at: datetime
+    # Antiguedad ya calculada por la API, por la misma razon que en
+    # ConversationRead: el reloj lo tiene un solo lado.
+    minutos: int
+
+
 class ManualModeStart(BaseModel):
     """Cuanto dura la pausa. Sin valor, se usa `settings.manual_mode_hours`.
 

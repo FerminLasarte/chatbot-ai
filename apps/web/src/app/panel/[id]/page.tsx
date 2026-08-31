@@ -25,8 +25,10 @@ import {
   reanudarBot,
   revocarClave,
   subirDocumento,
+  traerHiloDelCliente,
 } from "../acciones";
 import { Boton, Formulario, FormularioClave, FormularioLink } from "../ui";
+import { VerConversacion } from "@/components/hilo";
 import { claseInput } from "@/lib/estilos";
 import { duracion } from "@/lib/duracion";
 
@@ -400,12 +402,25 @@ function Hilo({ conversacion, tenantId }: { conversacion: Conversacion; tenantId
           </span>
         </span>
 
-        {conversacion.minutos_restantes !== null && (
-          <span className="text-xs text-amber-700 dark:text-amber-400">
-            Lo atend&eacute;s vos &mdash; el bot vuelve en{" "}
-            {duracion(conversacion.minutos_restantes)}
-          </span>
-        )}
+        <span className="flex shrink-0 flex-col items-end gap-1">
+          {conversacion.minutos_restantes !== null && (
+            <span className="text-xs text-amber-700 dark:text-amber-400">
+              Lo atend&eacute;s vos &mdash; el bot vuelve en{" "}
+              {duracion(conversacion.minutos_restantes)}
+            </span>
+          )}
+          {/* "A mano" y no "Vos": del lado de la agencia, quien contesto desde
+              el celular es el comercio, no quien esta mirando el panel. */}
+          <VerConversacion
+            conversacionId={conversacion.id}
+            titulo={esWhatsApp ? `+${conversacion.external_id}` : conversacion.external_id}
+            subtitulo={`${conversacion.mensajes} mensajes · hace ${duracion(
+              conversacion.minutos_inactiva,
+            )}`}
+            etiquetaPersona="A mano"
+            traer={traerHiloDelCliente.bind(null, tenantId)}
+          />
+        </span>
       </div>
 
       {conversacion.en_modo_manual ? (

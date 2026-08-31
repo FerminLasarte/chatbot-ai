@@ -34,6 +34,20 @@ export type ConversacionDelPortal = {
   ultimo_mensaje: string | null;
 };
 
+/** Un mensaje del hilo. Es el `MessageRead` de la API. */
+export type MensajeDelHilo = {
+  id: string;
+  /** "user" = el cliente final; "assistant" = el negocio. */
+  role: string;
+  /** Quien escribio los del negocio: "bot", "persona", o null en los mensajes
+   *  anteriores a que la API empezara a anotarlo. */
+  autor: string | null;
+  content: string;
+  created_at: string;
+  /** Antiguedad en minutos, calculada por la API. Ver la nota de arriba. */
+  minutos: number;
+};
+
 /** Un error ya redactado para que lo lea el duenio del negocio. */
 export class ErrorPortal extends Error {
   constructor(
@@ -85,6 +99,9 @@ export const verMiNegocio = (clave: string) => pedir<NegocioDelPortal>(clave, "/
 
 export const listarMisConversaciones = (clave: string) =>
   pedir<ConversacionDelPortal[]>(clave, "/conversations");
+
+export const verMiConversacion = (clave: string, conversacionId: string) =>
+  pedir<MensajeDelHilo[]>(clave, `/conversations/${conversacionId}/messages`);
 
 export const pausarMiBot = (clave: string, conversacionId: string, horas: number) =>
   pedir<ConversacionDelPortal>(clave, `/conversations/${conversacionId}/manual`, {

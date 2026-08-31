@@ -118,6 +118,19 @@ export const borrarDocumento = (id: string, docId: string) =>
 
 export const verUso = (id: string) => pedir<Uso>(`/tenants/${id}/usage`);
 
+/** Igual que `MensajeDelHilo` de lib/portal.ts: es el mismo `MessageRead`. */
+export type Mensaje = {
+  id: string;
+  role: string;
+  autor: string | null;
+  content: string;
+  created_at: string;
+  minutos: number;
+};
+
+export const verConversacion = (id: string, conversacionId: string) =>
+  pedir<Mensaje[]>(`/tenants/${id}/conversations/${conversacionId}/messages`);
+
 export type WhatsApp = {
   phone_number_id: string | null;
   /** La WABA del cliente del lado de Meta. La completa el alta por link; en los

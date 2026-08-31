@@ -37,7 +37,7 @@ from fastapi import APIRouter, HTTPException, Query, status
 
 from app.api.v1.deps import CurrentTenant, DbSession, PortalKey
 from app.core.config import settings
-from app.schemas.chat import ConversationRead, ManualModeStart, PortalTenant
+from app.schemas.chat import ConversationRead, ManualModeStart, MessageRead, PortalTenant
 from app.services import conversaciones
 
 router = APIRouter(prefix="/portal", tags=["portal"])
@@ -71,6 +71,21 @@ async def mis_conversaciones(
 ) -> list[ConversationRead]:
     """Las conversaciones del propio negocio, la ultima primero."""
     return await conversaciones.listar(db, tenant.id, limite=limite)
+
+
+@router.get("/conversations/{conversation_id}/messages", response_model=list[MessageRead])
+async def mi_conversacion(
+    conversation_id: uuid.UUID,
+    tenant: CurrentTenant,
+    db: DbSession,
+    _: PortalKey,
+    limite: int = Query(default=200, ge=1, le=500),
+) -> list[MessageRead]:
+    """El hilo completo, para poder ver que se dijo y no solo el ultimo mensaje."""
+    try:
+        return await conversaciones.listar_mensajes(db, tenant.id, conversation_id, limite=limite)
+    except conversaciones.ConversacionNoEncontrada as exc:
+        raise _no_encontrada() from exc
 
 
 @router.post("/conversations/{conversation_id}/manual", response_model=ConversationRead)

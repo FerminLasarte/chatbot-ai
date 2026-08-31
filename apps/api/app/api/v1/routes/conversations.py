@@ -28,7 +28,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.v1.deps import AdminKey, DbSession
 from app.core.config import settings
 from app.models.tenant import Tenant
-from app.schemas.chat import ConversationRead, ManualModeStart
+from app.schemas.chat import ConversationRead, ManualModeStart, MessageRead
 from app.services import conversaciones
 
 router = APIRouter(prefix="/tenants/{tenant_id}/conversations", tags=["conversations"])
@@ -55,6 +55,22 @@ async def list_conversations(
     """Las conversaciones mas recientes del cliente, la ultima primero."""
     await _tenant_o_404(db, tenant_id)
     return await conversaciones.listar(db, tenant_id, limite=limite)
+
+
+@router.get("/{conversation_id}/messages", response_model=list[MessageRead])
+async def read_messages(
+    tenant_id: uuid.UUID,
+    conversation_id: uuid.UUID,
+    db: DbSession,
+    _: AdminKey,
+    limite: int = Query(default=200, ge=1, le=500),
+) -> list[MessageRead]:
+    """El hilo completo, para dar soporte sin pedirle capturas al cliente."""
+    await _tenant_o_404(db, tenant_id)
+    try:
+        return await conversaciones.listar_mensajes(db, tenant_id, conversation_id, limite=limite)
+    except conversaciones.ConversacionNoEncontrada as exc:
+        raise _no_encontrada() from exc
 
 
 @router.post("/{conversation_id}/manual", response_model=ConversationRead)
