@@ -93,7 +93,35 @@ type Estado =
 // Solo se aceptan mensajes venidos de Facebook. Sin este filtro, cualquier
 // pagina o iframe podria mandarle un `message` a esta ventana con un waba_id
 // inventado y hacernos conectar un numero que no es el del cliente.
-const ORIGENES_META = ["https://www.facebook.com", "https://web.facebook.com"];
+//
+// La comprobacion es por dominio y no por una lista de URLs exactas: el
+// asistente cambia de subdominio segun el paso (www, web, business) y la lista
+// dejaba afuera mensajes legitimos. Sigue siendo estricta -host exacto o
+// subdominio directo, y siempre https-, que es lo que importa para que no
+// entre cualquiera.
+function esDeMeta(origen: string): boolean {
+  try {
+    const { protocol, hostname } = new URL(origen);
+    return (
+      protocol === "https:" && (hostname === "facebook.com" || hostname.endsWith(".facebook.com"))
+    );
+  } catch {
+    return false;
+  }
+}
+
+// Con que evento cierra Meta el asistente depende del camino: el alta estandar
+// termina en FINISH y la de coexistence en
+// FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING. Los dos traen los mismos datos.
+//
+// ★ Por eso se reconocen por prefijo y no por una lista de nombres. Escuchar
+// solo "FINISH" fue justamente el bug que dejaba el alta de coexistence sin
+// terminar: Meta mandaba el numero elegido, esta pagina lo descartaba por no
+// reconocer el nombre del evento, y el cliente terminaba viendo "Facebook no
+// devolvio el numero elegido" despues de haber hecho todo bien. Meta ya
+// renombro cosas de este flujo una vez (el featureType "coexistence"), asi que
+// la version estricta se vuelve a romper sola.
+const esCierre = (evento: string | undefined): boolean => !!evento?.startsWith("FINISH");
 
 declare global {
   interface Window {
@@ -167,7 +195,7 @@ export function BotonConectar({
   // --- Mensajes del popup ---
   useEffect(() => {
     const alRecibir = (evento: MessageEvent) => {
-      if (!ORIGENES_META.includes(evento.origin)) return;
+      if (!esDeMeta(evento.origin)) return;
 
       let cuerpo: {
         type?: string;
@@ -184,7 +212,7 @@ export function BotonConectar({
       // Llego algo de Meta: la ventana se abrio.
       cancelarEspera();
 
-      if (cuerpo.event === "FINISH" && cuerpo.data?.waba_id && cuerpo.data?.phone_number_id) {
+      if (esCierre(cuerpo.event) && cuerpo.data?.waba_id && cuerpo.data?.phone_number_id) {
         datos.current = {
           waba_id: cuerpo.data.waba_id,
           phone_number_id: cuerpo.data.phone_number_id,
