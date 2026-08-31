@@ -18,6 +18,50 @@ import { conectarWhatsApp } from "../acciones";
 
 type DatosSignup = { waba_id: string; phone_number_id: string };
 
+// ★ Lo que devuelve el popup se guarda en sessionStorage, no solo en memoria.
+//
+// No es una precaucion teorica: es el modo de falla del alta desde el celular,
+// que es como la abre casi todo el mundo. Para terminar el asistente hay que
+// salir a la app de WhatsApp Business, y al volver iOS ya descarto la pestania.
+// Con el estado solo en memoria eso borra lo que Meta habia devuelto, y el
+// cliente se encuentra la pagina como al principio, sin un solo error a la
+// vista, cuando del lado de Meta el alta quedo hecha.
+const CLAVE_DATOS = (token: string) => `alta-whatsapp:${token}`;
+
+// El asistente de Meta caduca a las 24 h. Datos mas viejos que eso ya no sirven
+// para completar nada y lo unico que harian es prometer un atajo que no existe.
+const VIGENCIA_MS = 24 * 60 * 60 * 1000;
+
+function leerGuardado(token: string): DatosSignup | null {
+  try {
+    const crudo = sessionStorage.getItem(CLAVE_DATOS(token));
+    if (!crudo) return null;
+    const { waba_id, phone_number_id, ts } = JSON.parse(crudo);
+    if (!waba_id || !phone_number_id || Date.now() - ts > VIGENCIA_MS) return null;
+    return { waba_id, phone_number_id };
+  } catch {
+    // Safari en navegacion privada tira al tocar sessionStorage. Que no se
+    // pueda recordar no es razon para romper el alta: se sigue sin memoria.
+    return null;
+  }
+}
+
+function guardarDatos(token: string, datos: DatosSignup): void {
+  try {
+    sessionStorage.setItem(CLAVE_DATOS(token), JSON.stringify({ ...datos, ts: Date.now() }));
+  } catch {
+    /* ver leerGuardado */
+  }
+}
+
+function olvidarDatos(token: string): void {
+  try {
+    sessionStorage.removeItem(CLAVE_DATOS(token));
+  } catch {
+    /* ver leerGuardado */
+  }
+}
+
 // Los dos caminos de alta. NO son la misma pantalla de Meta con un detalle
 // distinto: el `featureType` decide cual de los dos asistentes abre el popup, y
 // elegir mal deja al cliente sin salida.
@@ -83,6 +127,42 @@ export function BotonConectar({
   // ninguno es el "normal". Que elija.
   const [camino, setCamino] = useState<Camino | null>(null);
   const datos = useRef<DatosSignup | null>(null);
+  // El alta quedo a medias en un intento anterior y se puede retomar.
+  const [retomable, setRetomable] = useState(false);
+  // El navegador se comio la ventana emergente (ver `espera`).
+  const [sinVentana, setSinVentana] = useState(false);
+  const espera = useRef<number | null>(null);
+
+  // --- Rescate de un intento anterior ---
+  // Si la pestania se recargo despues de que Meta devolviera los datos, aca es
+  // donde se recuperan.
+  //
+  // La lectura va en un timeout y no en el cuerpo del efecto por dos razones
+  // que apuntan al mismo lado: sessionStorage no existe cuando la pagina se
+  // renderiza en el servidor, asi que leerlo antes de la hidratacion daria un
+  // HTML distinto del que mando el servidor; y setState sincrono dentro de un
+  // efecto encadena renders (el linter lo rechaza).
+  useEffect(() => {
+    const id = window.setTimeout(() => {
+      const guardado = leerGuardado(token);
+      if (!guardado) return;
+      datos.current = guardado;
+      setRetomable(true);
+    }, 0);
+    return () => clearTimeout(id);
+  }, [token]);
+
+  /** Hubo senial de Meta: la ventana existe, no hace falta seguir esperandola. */
+  const cancelarEspera = useCallback(() => {
+    if (espera.current !== null) {
+      clearTimeout(espera.current);
+      espera.current = null;
+    }
+    setSinVentana(false);
+  }, []);
+
+  // Que no quede un temporizador vivo si el cliente se va de la pagina.
+  useEffect(() => () => cancelarEspera(), [cancelarEspera]);
 
   // --- Mensajes del popup ---
   useEffect(() => {
@@ -101,11 +181,15 @@ export function BotonConectar({
       }
       if (cuerpo?.type !== "WA_EMBEDDED_SIGNUP") return;
 
+      // Llego algo de Meta: la ventana se abrio.
+      cancelarEspera();
+
       if (cuerpo.event === "FINISH" && cuerpo.data?.waba_id && cuerpo.data?.phone_number_id) {
         datos.current = {
           waba_id: cuerpo.data.waba_id,
           phone_number_id: cuerpo.data.phone_number_id,
         };
+        guardarDatos(token, datos.current);
         return;
       }
 
@@ -113,6 +197,8 @@ export function BotonConectar({
       // quedo, y sirve para decirle algo mas util que "fallo".
       if (cuerpo.event === "CANCEL") {
         datos.current = null;
+        olvidarDatos(token);
+        setRetomable(false);
         setEstado({
           paso: "error",
           mensaje: cuerpo.data?.current_step
@@ -124,11 +210,11 @@ export function BotonConectar({
 
     window.addEventListener("message", alRecibir);
     return () => window.removeEventListener("message", alRecibir);
-  }, []);
+  }, [token, cancelarEspera]);
 
   const finalizar = useCallback(
     async (code: string) => {
-      const ids = datos.current;
+      const ids = datos.current ?? leerGuardado(token);
       if (!ids) {
         setEstado({
           paso: "error",
@@ -143,6 +229,11 @@ export function BotonConectar({
       // El code es de un solo uso: si el alta fallo, hay que volver a pasar por
       // el popup, no reintentar con el mismo.
       datos.current = null;
+      setRetomable(false);
+      // Los ids guardados, en cambio, solo se tiran cuando el alta salio bien.
+      // Si fallo, siguen siendo los del numero que el cliente eligio y le
+      // ahorran rehacer el asistente entero en el proximo intento.
+      if (!r.error) olvidarDatos(token);
 
       setEstado(
         r.error ? { paso: "error", mensaje: r.error } : { paso: "ok", advertencia: r.advertencia },
@@ -155,8 +246,18 @@ export function BotonConectar({
     if (!window.FB || !camino) return;
     setEstado({ paso: "listo" });
 
+    // ★ Si el navegador bloquea la ventana emergente, `FB.login` no llama al
+    // callback ni avisa de ninguna manera: el boton parece roto y el cliente se
+    // queda mirando una pagina que no reacciona. No hay forma de preguntarle al
+    // navegador si la bloqueo -abrir una ventana de prueba para averiguarlo
+    // arriesga que la segunda, la que importa, sea la que bloquee-, asi que se
+    // mide por lo unico observable: unos segundos sin una sola senial de Meta.
+    cancelarEspera();
+    espera.current = window.setTimeout(() => setSinVentana(true), 4000);
+
     window.FB.login(
       (respuesta) => {
+        cancelarEspera();
         const code = respuesta?.authResponse?.code;
         if (!code) {
           // Sin code no hay nada que hacer: o cancelo, o no dio los permisos.
@@ -181,7 +282,7 @@ export function BotonConectar({
         extras: { setup: {}, featureType: FEATURE_TYPE[camino], sessionInfoVersion: "3" },
       },
     );
-  }, [camino, configId, finalizar]);
+  }, [camino, configId, finalizar, cancelarEspera]);
 
   if (estado.paso === "ok") {
     return (
@@ -273,6 +374,31 @@ export function BotonConectar({
           className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950 dark:text-red-300"
         >
           {estado.mensaje}
+        </p>
+      )}
+
+      {/* Los dos avisos de abajo no son errores: el alta todavia se puede
+          terminar. Por eso van en ambar y no en rojo, y por eso dicen que hacer
+          en vez de que paso. */}
+      {sinVentana && estado.paso !== "conectando" && (
+        <p
+          role="status"
+          className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+        >
+          &iquest;No se abri&oacute; la ventana de Facebook? Suele ser el bloqueador de ventanas
+          emergentes del navegador. Permitilas para esta p&aacute;gina y volv&eacute; a tocar el
+          bot&oacute;n.
+        </p>
+      )}
+
+      {retomable && estado.paso === "listo" && (
+        <p
+          role="status"
+          className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+        >
+          Ya hab&iacute;as elegido tu n&uacute;mero en un intento anterior, pero el alta no
+          lleg&oacute; a terminarse. Volv&eacute; a tocar el bot&oacute;n: el asistente deber&iacute;a
+          pasar mucho m&aacute;s r&aacute;pido esta vez.
         </p>
       )}
     </div>
