@@ -98,8 +98,16 @@ def _payload(**extra: str) -> dict:
 class _MetaFalsa:
     """Reemplaza los tres pasos contra Meta y anota cuales se llamaron."""
 
-    def __init__(self, *, falla: str | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        falla: str | None = None,
+        error_de_registro: str = "el numero ya tenia verificacion en dos pasos",
+    ) -> None:
         self.falla = falla
+        # El texto importa: hay un rechazo de Meta que NO es una falla (ver
+        # test_el_rechazo_del_registro_en_coexistence_no_asusta_al_cliente).
+        self.error_de_registro = error_de_registro
         self.llamadas: list[str] = []
 
     def instalar(self, monkeypatch: pytest.MonkeyPatch) -> "_MetaFalsa":
@@ -117,7 +125,7 @@ class _MetaFalsa:
         async def registrar(phone_number_id: str, access_token: str, pin: str) -> None:
             self.llamadas.append("registrar")
             if self.falla == "registrar":
-                raise wa_client.AltaWhatsAppError("el numero ya tenia verificacion en dos pasos")
+                raise wa_client.AltaWhatsAppError(self.error_de_registro)
 
         monkeypatch.setattr(wa_client, "canjear_code_por_token", canjear)
         monkeypatch.setattr(wa_client, "suscribir_webhook", suscribir)
@@ -355,6 +363,33 @@ async def test_si_falla_el_registro_el_alta_igual_queda_pero_avisa(
     assert r.status_code == 200
     assert r.json()["conectado"] is True
     assert r.json()["advertencia"] is not None
+
+    await db.refresh(a)
+    assert whatsapp.tiene_whatsapp(a)
+
+
+async def test_el_rechazo_del_registro_en_coexistence_no_asusta_al_cliente(
+    cliente: AsyncClient, escenario: dict, db: AsyncSession, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """★ Un numero que viene de la app WhatsApp Business no se registra: Meta
+    rechaza el endpoint a proposito y eso es lo esperable, no una falla.
+
+    Sin esta rama, el alta que MEJOR salio -la de coexistence, que es la que
+    queremos vender- termina con un cartel que manda al cliente a revisar una
+    verificacion en dos pasos que no tiene."""
+    _MetaFalsa(
+        falla="registrar",
+        error_de_registro=(
+            'no se pudo registrar el numero (400: {"error":{"message":'
+            '"Register endpoint is not available for SMB businesses.","code":100}})'
+        ),
+    ).instalar(monkeypatch)
+    a = escenario["a"]
+    token = onboarding.emitir(a.id).token
+
+    r = await cliente.post(f"/api/v1/onboarding/{token}/conectar", json=_payload())
+    assert r.status_code == 200
+    assert r.json() == {"conectado": True, "advertencia": None}
 
     await db.refresh(a)
     assert whatsapp.tiene_whatsapp(a)
