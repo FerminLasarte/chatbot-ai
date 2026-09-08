@@ -29,6 +29,19 @@ from app.schemas.chat import ConversationRead, MessageRead
 # hablando; el resto seria volcar la conversacion entera en una lista.
 LARGO_ADELANTO = 140
 
+# ★ LA VENTANA DE ATENCION AL CLIENTE DE META.
+#
+# Fuera de las 24 h desde el ULTIMO mensaje DEL CLIENTE, Meta rechaza cualquier
+# texto libre: solo deja mandar plantillas aprobadas. El rechazo llega como un
+# 4xx despues de haber escrito la respuesta, asi que si no se sabe de antemano,
+# quien contesta desde el panel escribe un parrafo y recien ahi se entera de que
+# no se puede mandar.
+#
+# Se mide contra el ultimo mensaje del CLIENTE y no contra `last_activity_at`:
+# esa fecha se mueve tambien cuando contesta el bot, asi que un hilo donde el
+# bot hablo ultimo pareceria tener la ventana abierta cuando ya vencio.
+HORAS_DE_VENTANA = 24
+
 
 class ConversacionNoEncontrada(Exception):
     """No existe, o existe pero es de otro cliente. A proposito no se distingue."""
@@ -47,11 +60,24 @@ def _minutos(desde: datetime, hasta: datetime) -> int:
     return max(0, int((hasta - desde).total_seconds() // 60))
 
 
-def _to_read(c: Conversation, mensajes: int, ultimo: str | None) -> ConversationRead:
+def _to_read(
+    c: Conversation,
+    mensajes: int,
+    ultimo: str | None,
+    ultimo_del_cliente: datetime | None,
+) -> ConversationRead:
     # Un unico `ahora` para toda la fila: con dos lecturas del reloj, una fila
     # podria salir "en modo manual" con cero minutos restantes.
     ahora = datetime.now(UTC)
     manual = c.en_modo_manual(ahora)
+
+    # La ventana solo existe si el cliente escribio alguna vez. En una
+    # conversacion sin ningun mensaje del cliente no hay nada que contestar.
+    minutos_de_ventana: int | None = None
+    if ultimo_del_cliente is not None:
+        vence = ultimo_del_cliente + timedelta(hours=HORAS_DE_VENTANA)
+        minutos_de_ventana = _minutos(ahora, vence) if vence > ahora else 0
+
     return ConversationRead(
         id=str(c.id),
         channel=c.channel,
@@ -68,6 +94,8 @@ def _to_read(c: Conversation, mensajes: int, ultimo: str | None) -> Conversation
         minutos_desde_derivacion=(_minutos(c.derivada_at, ahora) if c.derivada_at else None),
         mensajes=mensajes,
         ultimo_mensaje=_adelanto(ultimo),
+        ventana_abierta=bool(minutos_de_ventana),
+        minutos_de_ventana=minutos_de_ventana,
     )
 
 
@@ -85,6 +113,16 @@ async def buscar(
     return conversacion
 
 
+async def _ultimo_del_cliente(db: AsyncSession, conversation_id: uuid.UUID) -> datetime | None:
+    """Cuando escribio el cliente final por ultima vez. Define la ventana."""
+    return await db.scalar(
+        select(Message.created_at)
+        .where(Message.conversation_id == conversation_id, Message.role == "user")
+        .order_by(Message.position.desc())
+        .limit(1)
+    )
+
+
 async def detalle(db: AsyncSession, conversacion: Conversation) -> ConversationRead:
     """Recuenta una sola conversacion, para devolverla despues de tocarla."""
     mensajes = await db.scalar(
@@ -96,7 +134,8 @@ async def detalle(db: AsyncSession, conversacion: Conversation) -> ConversationR
         .order_by(Message.position.desc())
         .limit(1)
     )
-    return _to_read(conversacion, mensajes or 0, ultimo)
+    del_cliente = await _ultimo_del_cliente(db, conversacion.id)
+    return _to_read(conversacion, mensajes or 0, ultimo, del_cliente)
 
 
 async def listar(
@@ -129,7 +168,17 @@ async def listar(
     # es lo que permite que dict() conserve los tipos (uuid -> texto del mensaje).
     ultimos = dict(ultimos_filas.tuples().all())
 
-    return [_to_read(c, n, ultimos.get(c.id)) for c, n in conversaciones]
+    # Y el ultimo mensaje DEL CLIENTE de cada hilo, con el mismo DISTINCT ON:
+    # es lo que define si la ventana de Meta sigue abierta (ver HORAS_DE_VENTANA).
+    del_cliente_filas = await db.execute(
+        select(Message.conversation_id, Message.created_at)
+        .where(Message.conversation_id.in_(ids), Message.role == "user")
+        .distinct(Message.conversation_id)
+        .order_by(Message.conversation_id, Message.position.desc())
+    )
+    del_cliente = dict(del_cliente_filas.tuples().all())
+
+    return [_to_read(c, n, ultimos.get(c.id), del_cliente.get(c.id)) for c, n in conversaciones]
 
 
 async def pausar(

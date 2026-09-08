@@ -114,6 +114,24 @@ class ConversationRead(BaseModel):
     minutos_desde_derivacion: int | None
     mensajes: int
     ultimo_mensaje: str | None
+    # ★ La ventana de atencion al cliente de Meta: fuera de las 24 h desde el
+    # ultimo mensaje DEL CLIENTE no se puede mandar texto libre. Se resuelve
+    # aca y no en el navegador porque el navegador no tiene forma de saberlo:
+    # sin esto, quien contesta escribe la respuesta entera y recien al enviarla
+    # se entera, con el error de Meta en ingles. Ver services/conversaciones.py.
+    ventana_abierta: bool
+    # Cuanto queda de esa ventana. None = el cliente nunca escribio.
+    minutos_de_ventana: int | None
+
+
+class RespuestaManual(BaseModel):
+    """Un mensaje escrito por una persona para mandarle al cliente final.
+
+    El tope de largo es el de un mensaje de texto de WhatsApp: mas que eso lo
+    rechaza Meta, y conviene frenarlo aca antes de gastar la llamada.
+    """
+
+    texto: str = Field(min_length=1, max_length=4000)
 
 
 class MessageRead(BaseModel):
@@ -257,6 +275,39 @@ class PortalTenant(BaseModel):
     """
 
     nombre: str
+
+
+class TenantSummary(BaseModel):
+    """Un cliente en la lista del panel: como viene, sin tener que entrar.
+
+    Es deliberadamente distinto de TenantRead. Ese es la ficha de configuracion
+    -trae el system_prompt entero- y esto es un tablero: numeros ya resueltos
+    para decidir a cual de todos los clientes hay que entrar ahora.
+
+    Los minutos los calcula la API, igual que en ConversationRead: el panel se
+    renderiza en el servidor y no puede restar fechas por su cuenta.
+    """
+
+    id: str
+    slug: str
+    name: str
+    is_active: bool
+
+    # Lo que pide accion.
+    esperando: int
+    minutos_de_la_mas_vieja: int | None
+    incidentes: int
+
+    # Como viene.
+    conversaciones_activas: int
+    conversaciones: int
+    minutos_ultima_actividad: int | None
+    mensajes_del_mes: int
+    limite_mensual: int | None
+
+    # Si el bot puede trabajar y si el duenio puede mirar.
+    whatsapp_configurado: bool
+    tiene_portal: bool
 
 
 class IncidentRead(BaseModel):
