@@ -293,3 +293,37 @@ export async function traerHiloDelCliente(
     return { error: "No se pudo abrir la conversacion." };
   }
 }
+
+/** Lo que el navegador recibe al mandar una respuesta: el mensaje, o un motivo. */
+export type RespuestaEnviada = { mensaje?: api.Mensaje; error?: string };
+
+/**
+ * Contesta a mano en una conversacion de un cliente.
+ *
+ * ★ EL ERROR SE DEVUELVE TAL CUAL LO MANDA LA API, y no traducido a un
+ * generico. Los motivos por los que un envio no sale -la ventana de 24 h
+ * vencida, el cliente sin WhatsApp conectado- ya vienen redactados para que los
+ * lea una persona, y cada uno dice algo distinto que hacer. Taparlos con "no se
+ * pudo enviar" deja a quien atiende sin saber si conviene reintentar, esperar a
+ * que el cliente escriba, o ir a conectar el WhatsApp.
+ */
+export async function responderAlCliente(
+  id: string,
+  conversacionId: string,
+  texto: string,
+): Promise<RespuestaEnviada> {
+  await exigirSesion();
+
+  const limpio = texto.trim();
+  if (!limpio) return { error: "No se puede mandar un mensaje vacio." };
+
+  try {
+    const mensaje = await api.responderConversacion(id, conversacionId, limpio);
+    // La conversacion queda pausada y sin derivacion pendiente: la lista de
+    // atras tiene que reflejarlo sin que nadie recargue a mano.
+    revalidatePath(`/panel/${id}`);
+    return { mensaje };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "No se pudo enviar el mensaje." };
+  }
+}

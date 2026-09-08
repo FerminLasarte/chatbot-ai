@@ -36,6 +36,12 @@ export type ConversacionDelPortal = {
   minutos_restantes: number | null;
   mensajes: number;
   ultimo_mensaje: string | null;
+  /** ★ La ventana de atencion al cliente de Meta: fuera de las 24 h desde el
+   *  ultimo mensaje del cliente final, WhatsApp no deja mandar texto libre. La
+   *  calcula la API; sin esto, el duenio escribe la respuesta entera y recien
+   *  al mandarla se entera de que no se puede. */
+  ventana_abierta: boolean;
+  minutos_de_ventana: number | null;
 };
 
 /** Un mensaje del hilo. Es el `MessageRead` de la API. */
@@ -117,4 +123,18 @@ export const pausarMiBot = (clave: string, conversacionId: string, horas: number
 export const reanudarMiBot = (clave: string, conversacionId: string) =>
   pedir<ConversacionDelPortal>(clave, `/conversations/${conversacionId}/manual`, {
     method: "DELETE",
+  });
+
+/**
+ * Le contesta al cliente final en nombre del negocio.
+ *
+ * Ademas de enviar, la API pausa el asistente y da por atendida la derivacion:
+ * contestar a mano es la forma mas fuerte de decir "esto lo atiendo yo". Ver
+ * `services/responder.py`.
+ */
+export const responderYoMismo = (clave: string, conversacionId: string, texto: string) =>
+  pedir<MensajeDelHilo>(clave, `/conversations/${conversacionId}/messages`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ texto }),
   });

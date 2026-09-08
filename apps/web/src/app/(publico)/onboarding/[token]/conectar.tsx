@@ -315,11 +315,11 @@ export function BotonConectar({
   if (estado.paso === "ok") {
     return (
       <div className="flex flex-col gap-3">
-        <p className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-700 dark:bg-green-950 dark:text-green-300">
+        <p className="rounded-control bg-ok-suave px-3 py-2 text-sm text-ok">
           Listo, tu WhatsApp qued&oacute; conectado. Ya pod&eacute;s cerrar esta p&aacute;gina.
         </p>
         {estado.advertencia && (
-          <p className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+          <p className="rounded-control bg-alerta-suave px-3 py-2 text-sm text-alerta">
             {estado.advertencia}
           </p>
         )}
@@ -387,7 +387,7 @@ export function BotonConectar({
         type="button"
         onClick={abrirPopup}
         disabled={!sdkListo || !camino || estado.paso === "conectando"}
-        className="rounded-md bg-[#1877F2] px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-[#166FE5] disabled:opacity-40"
+        className="rounded-control bg-azul-meta px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-azul-meta-fuerte disabled:pointer-events-none disabled:opacity-40"
       >
         {estado.paso === "conectando"
           ? "Conectando…"
@@ -399,7 +399,7 @@ export function BotonConectar({
       {estado.paso === "error" && (
         <p
           role="status"
-          className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950 dark:text-red-300"
+          className="rounded-control bg-error-suave px-3 py-2 text-sm text-error"
         >
           {estado.mensaje}
         </p>
@@ -411,7 +411,7 @@ export function BotonConectar({
       {sinVentana && estado.paso !== "conectando" && (
         <p
           role="status"
-          className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+          className="rounded-control bg-alerta-suave px-3 py-2 text-sm text-alerta"
         >
           &iquest;No se abri&oacute; la ventana de Facebook? Suele ser el bloqueador de ventanas
           emergentes del navegador. Permitilas para esta p&aacute;gina y volv&eacute; a tocar el
@@ -422,7 +422,7 @@ export function BotonConectar({
       {retomable && estado.paso === "listo" && (
         <p
           role="status"
-          className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+          className="rounded-control bg-alerta-suave px-3 py-2 text-sm text-alerta"
         >
           Ya hab&iacute;as elegido tu n&uacute;mero en un intento anterior, pero el alta no
           lleg&oacute; a terminarse. Volv&eacute; a tocar el bot&oacute;n: el asistente deber&iacute;a

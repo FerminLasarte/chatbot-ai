@@ -31,11 +31,12 @@ from app.schemas.chat import (
     PromptUpdate,
     TenantCreate,
     TenantRead,
+    TenantSummary,
     UsageRead,
     WhatsAppRead,
     WhatsAppUpdate,
 )
-from app.services import onboarding, quota, whatsapp
+from app.services import onboarding, quota, resumen, whatsapp
 
 router = APIRouter(prefix="/tenants", tags=["tenants"])
 
@@ -121,6 +122,36 @@ async def create_tenant(payload: TenantCreate, db: DbSession, _: AdminKey) -> Te
 async def list_tenants(db: DbSession, _: AdminKey) -> list[TenantRead]:
     result = await db.execute(select(Tenant).order_by(Tenant.created_at.desc()))
     return [_to_read(t) for t in result.scalars().all()]
+
+
+@router.get("/resumen", response_model=list[TenantSummary])
+async def list_tenants_resumen(db: DbSession, _: AdminKey) -> list[TenantSummary]:
+    """Todos los clientes con como vienen, para la pantalla principal del panel.
+
+    ★ ORDEN IMPORTANTE: esta ruta literal va ANTES que las parametrizadas
+    (/{tenant_id}/...). FastAPI matchea en orden de declaracion, asi que si
+    quedara despues, "resumen" entraria como tenant_id y devolveria un 422 por
+    no ser un UUID. Mismo motivo por el que /me esta arriba de todo.
+    """
+    return [
+        TenantSummary(
+            id=str(r.id),
+            slug=r.slug,
+            name=r.name,
+            is_active=r.is_active,
+            esperando=r.esperando,
+            minutos_de_la_mas_vieja=r.minutos_de_la_mas_vieja,
+            incidentes=r.incidentes,
+            conversaciones_activas=r.conversaciones_activas,
+            conversaciones=r.conversaciones,
+            minutos_ultima_actividad=r.minutos_ultima_actividad,
+            mensajes_del_mes=r.mensajes_del_mes,
+            limite_mensual=r.limite_mensual,
+            whatsapp_configurado=r.whatsapp_configurado,
+            tiene_portal=r.tiene_portal,
+        )
+        for r in await resumen.por_cliente(db)
+    ]
 
 
 @router.post(

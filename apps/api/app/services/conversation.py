@@ -95,7 +95,7 @@ async def answer(
 
     # El mensaje del usuario se persiste ANTES de llamar al modelo: si la
     # generacion falla, la pregunta no se pierde.
-    await _guardar_mensaje(db, conversacion.id, ROL_USUARIO, question)
+    await guardar_mensaje(db, conversacion.id, ROL_USUARIO, question)
 
     chunks = await search(db, tenant.id, question)
 
@@ -106,7 +106,7 @@ async def answer(
 
     texto, deriva = separar_derivacion(respuesta.text)
 
-    await _guardar_mensaje(db, conversacion.id, ROL_ASISTENTE, texto, AUTOR_BOT)
+    await guardar_mensaje(db, conversacion.id, ROL_ASISTENTE, texto, AUTOR_BOT)
     await _tocar_actividad(db, conversacion)
 
     if deriva:
@@ -149,7 +149,7 @@ async def registrar_entrante(db: AsyncSession, conversacion: Conversation, texto
     Es el camino del modo manual: no se pierde el historial -la respuesta la
     escribe una persona en otra ventana- pero no se genera ni se cobra nada.
     """
-    await _guardar_mensaje(db, conversacion.id, ROL_USUARIO, texto)
+    await guardar_mensaje(db, conversacion.id, ROL_USUARIO, texto)
     await _tocar_actividad(db, conversacion)
 
 
@@ -162,7 +162,7 @@ async def registrar_saliente(db: AsyncSession, conversacion: Conversation, texto
     respondio. Cuando la pausa venza y el bot retome, la historia que ve el
     modelo tiene lo que dijo la persona en vez de un agujero.
     """
-    await _guardar_mensaje(db, conversacion.id, ROL_ASISTENTE, texto, AUTOR_PERSONA)
+    await guardar_mensaje(db, conversacion.id, ROL_ASISTENTE, texto, AUTOR_PERSONA)
     await _tocar_actividad(db, conversacion)
 
 
@@ -320,7 +320,7 @@ async def _cargar_historia(db: AsyncSession, conversation_id: uuid.UUID) -> list
     return historia
 
 
-async def _guardar_mensaje(
+async def guardar_mensaje(
     db: AsyncSession,
     conversation_id: uuid.UUID,
     role: str,
@@ -352,3 +352,8 @@ async def _guardar_mensaje(
 async def _tocar_actividad(db: AsyncSession, conversacion: Conversation) -> None:
     conversacion.last_activity_at = func.now()
     await db.commit()
+
+
+# Nombre historico del helper de arriba. Lo importan varios tests; se mantiene
+# para no reescribirlos por un renombre.
+_guardar_mensaje = guardar_mensaje

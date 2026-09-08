@@ -3,38 +3,69 @@
 // ★ QUE SE COMPARTE Y QUE NO
 // El panel de la agencia y el portal del cliente mantienen cada uno su propio
 // formulario y su propio tipo de estado, y esa frontera es a proposito (ver la
-// nota en panel/ui.tsx). Lo que NO tiene sentido duplicar es como se ve un
-// boton: la version copiada ya habia divergido de la original. Aca vive la
-// APARIENCIA; el comportamiento sigue de cada lado.
+// nota en app/(panel)/panel/ui.tsx). Lo que NO tiene sentido duplicar es como
+// se ve un boton: la version copiada ya habia divergido de la original. Aca
+// vive la APARIENCIA; el comportamiento sigue de cada lado.
+//
+// ★ POR QUE ESTOS COMPONENTES SIRVEN PARA LAS DOS PIELES
+// Ninguna clase de este archivo nombra un color ni una medida: dice
+// `bg-acento`, `rounded-control`, `py-fila`. Que el acento sea petroleo o
+// verde tinta, y que una fila mida 11 px o 15 px, lo decide la piel en la que
+// esta montado el componente (ver globals.css). Por eso el panel es denso y el
+// portal respira sin que exista una sola condicion en este archivo.
 //
 // ★ SIN "use client" A PROPOSITO
 // Estos componentes los usan paginas de servidor. Un modulo marcado con
 // "use client" exporta referencias, no valores: interpolarlas en un template
-// string deja el className en basura sin que TypeScript diga nada (ver la nota
-// larga en lib/estilos.ts).
+// string deja el className en basura sin que TypeScript diga nada.
 
-type Variante = "principal" | "suave" | "peligro";
+/* ---------------------------------------------------------------------------
+ * Botones
+ * ------------------------------------------------------------------------ */
+
+type Variante = "principal" | "suave" | "fantasma" | "peligro";
+type Tamanio = "normal" | "chico";
+
+const POR_VARIANTE: Record<Variante, string> = {
+  // Una sola cosa por pantalla merece ser el boton principal: el acento es lo
+  // que el ojo encuentra primero y pierde sentido si se reparte.
+  //
+  // `text-sobre-acento` y no `text-white`: en modo oscuro el acento se aclara,
+  // y un blanco fijo dejaria letras blancas sobre un fondo claro.
+  principal:
+    "bg-acento text-sobre-acento shadow-panel hover:bg-acento-fuerte active:translate-y-px",
+  suave:
+    "border border-borde-fuerte bg-superficie text-texto hover:bg-superficie-2 active:translate-y-px",
+  fantasma: "text-texto-suave hover:bg-superficie-2 hover:text-texto",
+  peligro: "border border-borde text-error hover:bg-error-suave hover:border-error",
+};
+
+const POR_TAMANIO: Record<Tamanio, string> = {
+  normal: "px-3.5 py-2 text-sm",
+  chico: "px-2.5 py-1.5 text-xs",
+};
 
 /** Clases de un boton. Suelta, para los `<button>` que ya viven en un cliente. */
-export function claseBoton(variante: Variante = "principal"): string {
-  const porVariante: Record<Variante, string> = {
-    // Una sola cosa por pantalla merece ser el boton principal: el acento es lo
-    // que el ojo encuentra primero y pierde sentido si se reparte.
-    principal: "bg-acento text-white hover:bg-acento-fuerte",
-    suave: "border border-borde-fuerte text-texto hover:bg-superficie-2",
-    peligro: "border border-borde text-error hover:bg-error-suave",
-  };
+export function claseBoton(variante: Variante = "principal", tamanio: Tamanio = "normal"): string {
   return (
-    "inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-sm " +
-    "font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 " +
-    porVariante[variante]
+    "inline-flex items-center justify-center gap-1.5 rounded-control font-medium " +
+    "whitespace-nowrap transition-[background-color,border-color,color,transform] " +
+    "duration-100 disabled:pointer-events-none disabled:opacity-40 " +
+    POR_TAMANIO[tamanio] +
+    " " +
+    POR_VARIANTE[variante]
   );
 }
 
+/* ---------------------------------------------------------------------------
+ * Campos
+ * ------------------------------------------------------------------------ */
+
 /** Un campo de texto. */
 export const claseCampo =
-  "w-full rounded-lg border border-borde bg-superficie px-3 py-2 text-sm text-texto " +
-  "placeholder:text-texto-tenue focus:border-acento focus:outline-none";
+  "w-full rounded-control border border-borde bg-superficie px-3 py-2 text-sm text-texto " +
+  "transition-colors placeholder:text-texto-tenue hover:border-borde-fuerte " +
+  "focus:border-acento focus:outline-none";
 
 /** La variante angosta: mide lo que mide su contenido (un desplegable de horas).
  *
@@ -42,7 +73,76 @@ export const claseCampo =
  *  entre dos utilidades de ancho por el orden en la hoja, no en el atributo. */
 export const claseCampoAngosto = claseCampo.replace("w-full ", "");
 
-/** Una tarjeta: el bloque blanco sobre el que se apoya todo. */
+/**
+ * Un campo de hora.
+ *
+ * ★ POR QUE ES UN COMPONENTE Y NO UN `<input type="time" className={claseCampo}>`
+ * Un campo de hora no es un campo de texto con otro `type`: el navegador le
+ * dibuja adentro su propio reloj, su propio separador y sus propias flechas, y
+ * cada uno lo hace distinto. Si no se decide una vez como se ve, la primera
+ * pantalla que lo use hereda lo que venga -en Chrome un icono negro que en
+ * modo oscuro queda invisible- y la segunda lo corrige a mano de otra forma.
+ *
+ * El ancho es fijo y no `w-full`: un campo de hora estirado a todo el ancho de
+ * una columna parece un campo de texto vacio, y en una fila de horario van dos
+ * seguidos. La medida sale del caso MAS ANCHO, que es el reloj de 12 h
+ * ("09:00 a. m." + el iconito): con el ancho justo para las 24 h, un navegador
+ * en ingles corta el "p. m." y nadie se entera hasta que lo abre un cliente.
+ *
+ * `step={60}` deja los segundos afuera. Sin eso, algunos navegadores muestran
+ * "09:00:00" y le piden a alguien que cargue los segundos de su horario de
+ * atencion.
+ */
+export function CampoDeHora({
+  name,
+  defaultValue,
+  etiqueta,
+  required,
+}: {
+  name: string;
+  defaultValue?: string;
+  /** Obligatoria: en una fila de horarios hay dos campos iguales al lado y sin
+   *  esto un lector de pantalla dice "hora, hora". */
+  etiqueta: string;
+  required?: boolean;
+}) {
+  return (
+    <input
+      type="time"
+      name={name}
+      defaultValue={defaultValue}
+      required={required}
+      step={60}
+      aria-label={etiqueta}
+      className={`tabular w-[9.5rem] rounded-control border border-borde bg-superficie px-2.5 py-1.5 text-sm text-texto transition-colors hover:border-borde-fuerte focus:border-acento focus:outline-none`}
+    />
+  );
+}
+
+/** La etiqueta de un campo. Va ARRIBA del campo, siempre visible: un
+ *  placeholder que hace de etiqueta desaparece justo cuando alguien esta
+ *  escribiendo y necesita confirmar que esta llenando lo que cree. */
+export function Etiqueta({
+  children,
+  ayuda,
+}: {
+  children: React.ReactNode;
+  /** Para que sirve el campo, en pocas palabras. */
+  ayuda?: string;
+}) {
+  return (
+    <span className="flex flex-col gap-0.5">
+      <span className="text-xs font-medium text-texto">{children}</span>
+      {ayuda && <span className="text-xs text-texto-suave">{ayuda}</span>}
+    </span>
+  );
+}
+
+/* ---------------------------------------------------------------------------
+ * Superficies
+ * ------------------------------------------------------------------------ */
+
+/** Una tarjeta: el bloque sobre el que se apoya todo. */
 export function Tarjeta({
   children,
   className = "",
@@ -52,7 +152,7 @@ export function Tarjeta({
 }) {
   return (
     <section
-      className={`rounded-xl border border-borde bg-superficie ${className}`}
+      className={`rounded-panel border border-borde bg-superficie shadow-panel ${className}`}
     >
       {children}
     </section>
@@ -64,7 +164,13 @@ export function Bloque({
   titulo,
   ayuda,
   acciones,
+  pie,
   children,
+  className = "",
+  /** Sin padding interno: para cuando adentro va una lista que llega hasta el
+   *  borde. Una lista con margen adentro de una tarjeta con margen se lee como
+   *  dos cajas, no como una. */
+  alBorde = false,
 }: {
   titulo: string;
   /** Para que sirve esto, en una linea. Va arriba y no abajo: se lee antes de
@@ -72,51 +178,96 @@ export function Bloque({
   ayuda?: string;
   /** Lo que se puede hacer con la seccion entera, alineado al titulo. */
   acciones?: React.ReactNode;
+  pie?: React.ReactNode;
   children: React.ReactNode;
+  className?: string;
+  alBorde?: boolean;
 }) {
   return (
-    <Tarjeta>
-      <header className="flex items-start justify-between gap-4 border-b border-borde px-5 py-4">
+    <Tarjeta className={`overflow-hidden ${className}`}>
+      <header className="flex items-start justify-between gap-4 border-b border-borde px-4 py-3">
         <div className="min-w-0">
-          <h2 className="text-sm font-semibold text-texto">{titulo}</h2>
-          {ayuda && <p className="mt-1 text-xs text-texto-suave">{ayuda}</p>}
+          <h2 className="font-titulo text-sm font-semibold tracking-tight text-texto">
+            {titulo}
+          </h2>
+          {ayuda && <p className="mt-0.5 text-xs text-texto-suave">{ayuda}</p>}
         </div>
-        {acciones}
+        {acciones && <div className="shrink-0">{acciones}</div>}
       </header>
-      <div className="px-5 py-4">{children}</div>
+
+      <div className={alBorde ? "" : "px-4 py-3.5"}>{children}</div>
+
+      {pie && <footer className="border-t border-borde px-4 py-3">{pie}</footer>}
     </Tarjeta>
   );
 }
+
+/** El encabezado de una pantalla: de que es, y la accion principal. */
+export function Encabezado({
+  titulo,
+  detalle,
+  acciones,
+}: {
+  titulo: string;
+  /** Una linea que diga como viene la cosa, no que es la pantalla. */
+  detalle?: React.ReactNode;
+  acciones?: React.ReactNode;
+}) {
+  return (
+    <header className="flex flex-wrap items-end justify-between gap-4">
+      <div className="min-w-0">
+        <h1 className="font-titulo text-2xl font-semibold tracking-tight text-texto">
+          {titulo}
+        </h1>
+        {detalle && <p className="mt-0.5 text-sm text-texto-suave">{detalle}</p>}
+      </div>
+      {acciones && <div className="flex shrink-0 items-center gap-2">{acciones}</div>}
+    </header>
+  );
+}
+
+/* ---------------------------------------------------------------------------
+ * Estado
+ * ------------------------------------------------------------------------ */
+
+type Tono = "neutro" | "alerta" | "ok" | "error" | "acento";
+
+const POR_TONO: Record<Tono, string> = {
+  neutro: "bg-superficie-2 text-texto-suave",
+  alerta: "bg-alerta-suave text-alerta",
+  ok: "bg-ok-suave text-ok",
+  error: "bg-error-suave text-error",
+  acento: "bg-acento-suave text-acento-fuerte",
+};
 
 /** Una etiqueta chica de estado. `alerta` es la que pide una accion. */
 export function Chip({
   tono = "neutro",
   children,
 }: {
-  tono?: "neutro" | "alerta" | "ok" | "acento";
+  tono?: Tono;
   children: React.ReactNode;
 }) {
-  const porTono = {
-    neutro: "bg-superficie-2 text-texto-suave",
-    alerta: "bg-alerta-suave text-alerta",
-    ok: "bg-ok-suave text-ok",
-    acento: "bg-acento-suave text-acento-fuerte",
-  }[tono];
-
   return (
     <span
-      className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium whitespace-nowrap ${porTono}`}
+      className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium whitespace-nowrap ${POR_TONO[tono]}`}
     >
-      {tono === "alerta" && <span className="size-1.5 rounded-full bg-alerta" />}
+      {/* El punto solo en los dos tonos que significan "esto no esta resuelto".
+          En un chip neutro seria decoracion. */}
+      {(tono === "alerta" || tono === "error") && (
+        <span className="size-1.5 rounded-full bg-current" />
+      )}
       {children}
     </span>
   );
 }
 
-/** El resultado de una accion: lo que salio bien o lo que fallo.
+/**
+ * El resultado de una accion: lo que salio bien o lo que fallo.
  *
- *  Recibe dos strings sueltos y no el `Estado` de cada lado a proposito: asi el
- *  portal no tiene que importar tipos del panel para verse igual. */
+ * Recibe dos strings sueltos y no el `Estado` de cada lado a proposito: asi el
+ * portal no tiene que importar tipos del panel para verse igual.
+ */
 export function Aviso({
   error,
   ok,
@@ -130,7 +281,7 @@ export function Aviso({
   return (
     <p
       role="status"
-      className={`rounded-lg px-3 py-2 text-sm ${
+      className={`rounded-control px-3 py-2 text-sm ${
         error ? "bg-error-suave text-error" : "bg-ok-suave text-ok"
       } ${className}`}
     >
@@ -139,7 +290,38 @@ export function Aviso({
   );
 }
 
-/** Lo que se muestra cuando una lista todavia no tiene nada. */
-export function Vacio({ children }: { children: React.ReactNode }) {
-  return <p className="py-2 text-sm text-texto-suave">{children}</p>;
+/**
+ * Lo que se muestra cuando una lista todavia no tiene nada.
+ *
+ * ★ Dice que va a pasar cuando haya algo, no "sin datos". Quien abre una
+ * pantalla vacia por primera vez necesita saber si esta rota o si todavia no
+ * paso nada.
+ */
+export function Vacio({
+  titulo,
+  children,
+  accion,
+}: {
+  titulo: string;
+  /** Que va a hacer que esto deje de estar vacio. */
+  children?: React.ReactNode;
+  accion?: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-col items-center gap-2 px-4 py-10 text-center">
+      <p className="font-titulo text-sm font-semibold text-texto">{titulo}</p>
+      {children && <p className="max-w-sm text-sm text-texto-suave">{children}</p>}
+      {accion && <div className="mt-2">{accion}</div>}
+    </div>
+  );
+}
+
+/** El esqueleto de algo que esta cargando: la forma, sin contenido inventado. */
+export function Esqueleto({ className = "" }: { className?: string }) {
+  return (
+    <div
+      aria-hidden="true"
+      className={`animate-pulse rounded-control bg-superficie-2 ${className}`}
+    />
+  );
 }

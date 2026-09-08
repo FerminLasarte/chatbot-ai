@@ -88,7 +88,7 @@ export function PanelLateral({
         role="dialog"
         aria-modal="true"
         aria-label={titulo}
-        className={`absolute inset-y-0 right-0 flex w-full flex-col border-borde bg-superficie shadow-2xl transition-transform duration-200 ease-out motion-reduce:transition-none sm:max-w-md sm:border-l ${
+        className={`absolute inset-y-0 right-0 flex w-full flex-col border-borde bg-superficie shadow-2xl transition-transform duration-200 ease-out motion-reduce:transition-none sm:max-w-lg sm:border-l ${
           entrando ? "translate-x-0" : "translate-x-full"
         }`}
       >
@@ -102,7 +102,7 @@ export function PanelLateral({
             type="button"
             onClick={cerrar}
             aria-label="Cerrar"
-            className="-mt-1 -mr-2 rounded-lg px-2 py-1 text-lg leading-none text-texto-tenue transition-colors hover:bg-superficie-2 hover:text-texto"
+            className="-mt-1 -mr-2 rounded-control px-2 py-1 text-lg leading-none text-texto-tenue transition-colors hover:bg-superficie-2 hover:text-texto"
           >
             &times;
           </button>

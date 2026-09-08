@@ -6,6 +6,7 @@ import {
   AccesoRevocado,
   pausarMiBot,
   reanudarMiBot,
+  responderYoMismo,
   verMiConversacion,
   type MensajeDelHilo,
 } from "@/lib/portal";
@@ -95,5 +96,39 @@ export async function traerMiHilo(conversacionId: string): Promise<HiloCargado> 
   } catch (e) {
     if (e instanceof AccesoRevocado) return { error: SIN_ACCESO };
     return { error: "No pudimos abrir esta conversacion. Proba de nuevo en un rato." };
+  }
+}
+
+/** Lo que el navegador recibe al mandar una respuesta: el mensaje, o un motivo. */
+export type RespuestaEnviada = { mensaje?: MensajeDelHilo; error?: string };
+
+/**
+ * El duenio del negocio le contesta a su cliente sin salir del portal.
+ *
+ * ★ El error de la API se devuelve tal cual. Los motivos por los que un envio
+ * no sale ya vienen redactados para que los lea alguien no tecnico -que
+ * pasaron las 24 h, que falta conectar el WhatsApp- y cada uno dice algo
+ * distinto que hacer. Un generico "no se pudo enviar" lo deja sin saber si
+ * conviene reintentar o esperar a que el cliente escriba.
+ */
+export async function responderYo(
+  conversacionId: string,
+  texto: string,
+): Promise<RespuestaEnviada> {
+  const clave = await claveDelPortal();
+  if (!clave) return { error: SIN_ACCESO };
+
+  const limpio = texto.trim();
+  if (!limpio) return { error: "Escribi algo antes de mandar." };
+
+  try {
+    const mensaje = await responderYoMismo(clave, conversacionId, limpio);
+    // La conversacion queda pausada y sin pedido pendiente: la lista de atras
+    // tiene que reflejarlo sin que nadie recargue.
+    revalidatePath("/mi-negocio");
+    return { mensaje };
+  } catch (e) {
+    if (e instanceof AccesoRevocado) return { error: SIN_ACCESO };
+    return { error: e instanceof Error ? e.message : "No se pudo enviar el mensaje." };
   }
 }

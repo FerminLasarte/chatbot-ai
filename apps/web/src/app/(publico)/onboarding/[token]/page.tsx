@@ -50,7 +50,7 @@ export default async function Onboarding({ params }: { params: Promise<{ token: 
         <h1 className="text-lg font-semibold text-texto">
           {estado.nombre_cliente}
         </h1>
-        <p className="mt-2 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700 dark:bg-green-950 dark:text-green-300">
+        <p className="mt-2 rounded-control bg-ok-suave px-3 py-2 text-sm text-ok">
           Tu WhatsApp ya est&aacute; conectado. No hace falta que hagas nada.
         </p>
       </Marco>

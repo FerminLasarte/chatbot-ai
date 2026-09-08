@@ -37,8 +37,14 @@ from fastapi import APIRouter, HTTPException, Query, status
 
 from app.api.v1.deps import CurrentTenant, DbSession, PortalKey
 from app.core.config import settings
-from app.schemas.chat import ConversationRead, ManualModeStart, MessageRead, PortalTenant
-from app.services import conversaciones
+from app.schemas.chat import (
+    ConversationRead,
+    ManualModeStart,
+    MessageRead,
+    PortalTenant,
+    RespuestaManual,
+)
+from app.services import conversaciones, responder
 
 router = APIRouter(prefix="/portal", tags=["portal"])
 
@@ -86,6 +92,38 @@ async def mi_conversacion(
         return await conversaciones.listar_mensajes(db, tenant.id, conversation_id, limite=limite)
     except conversaciones.ConversacionNoEncontrada as exc:
         raise _no_encontrada() from exc
+
+
+@router.post(
+    "/conversations/{conversation_id}/messages",
+    response_model=MessageRead,
+    status_code=status.HTTP_201_CREATED,
+)
+async def responder_yo_mismo(
+    conversation_id: uuid.UUID,
+    payload: RespuestaManual,
+    tenant: CurrentTenant,
+    db: DbSession,
+    _: PortalKey,
+) -> MessageRead:
+    """El duenio del negocio le contesta a su cliente sin salir del portal.
+
+    ★ Esto AMPLIA lo que puede hacer una clave de portal filtrada: antes el
+    peor caso era leer y pausar; ahora es escribirle a los clientes del negocio
+    en nombre del negocio. Se acepto porque es exactamente para lo que existe
+    el portal -que el duenio atienda- y porque el dano sigue acotado a su
+    propio negocio, es visible en el hilo y el remedio es inmediato: la agencia
+    emite otro link y el anterior deja de servir en el acto.
+
+    Lo que sigue sin poder: escribirle a un cliente que no le escribio primero.
+    La ventana de 24 h de Meta lo impide, y se comprueba antes de enviar.
+    """
+    try:
+        return await responder.responder(db, tenant, conversation_id, payload.texto)
+    except conversaciones.ConversacionNoEncontrada as exc:
+        raise _no_encontrada() from exc
+    except responder.NoSePuedeResponder as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
 
 
 @router.post("/conversations/{conversation_id}/manual", response_model=ConversationRead)

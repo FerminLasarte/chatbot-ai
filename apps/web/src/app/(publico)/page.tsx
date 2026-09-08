@@ -1,5 +1,6 @@
 "use client";
 
+import { InterruptorDeTema } from "@/components/tema";
 import { claseBoton, claseCampo } from "@/components/ui";
 
 import { FormEvent, useRef, useState } from "react";
@@ -102,17 +103,24 @@ export default function Home() {
   return (
     <div className="flex flex-1 flex-col items-center px-4 py-10">
       <div className="flex w-full max-w-2xl flex-col gap-6">
-        <header>
-          <h1 className="text-2xl font-semibold text-texto">
-            Chatbot AI — demo
-          </h1>
-          <p className="text-sm text-texto-suave">
-            Subi un documento y pregunt&aacute;le lo que quieras.
-          </p>
+        {/* ★ Esta es la URL raiz del producto y decia "Chatbot AI — demo", que
+            no es como se llama nada. Es la pantalla que se abre para mostrarle
+            el asistente a un cliente nuevo, asi que lleva el nombre real. */}
+        <header className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h1 className="font-titulo text-2xl font-semibold tracking-tight text-texto">
+              Probá el asistente
+            </h1>
+            <p className="mt-1 text-sm text-texto-suave">
+              Sub&iacute; un documento y pregunt&aacute;le lo que quieras. Es el mismo motor
+              que despu&eacute;s contesta por WhatsApp.
+            </p>
+          </div>
+          <InterruptorDeTema />
         </header>
 
         {sinClave && (
-          <div className="rounded-lg bg-alerta-suave p-4 text-sm text-alerta">
+          <div className="rounded-panel bg-alerta-suave p-4 text-sm text-alerta">
             Falta <code>NEXT_PUBLIC_API_KEY</code> en <code>apps/web/.env.local</code>. Corr&eacute;:
             <pre className="mt-2 overflow-x-auto rounded bg-superficie-2 p-2">
               cd apps/api &amp;&amp; uv run python -m app.cli crear-tenant-demo
@@ -121,8 +129,8 @@ export default function Home() {
           </div>
         )}
 
-        <section className="rounded-xl border border-borde bg-superficie p-5">
-          <label className="flex cursor-pointer flex-col items-center gap-2 rounded-md border-2 border-dashed border-borde-fuerte p-6 text-center transition-colors hover:border-acento">
+        <section className="rounded-panel border border-borde bg-superficie p-5 shadow-panel">
+          <label className="flex cursor-pointer flex-col items-center gap-2 rounded-control border-2 border-dashed border-borde-fuerte p-6 text-center transition-colors hover:border-acento">
             <span className="text-sm text-texto-suave">
               {documento.tipo === "vacio" && "Hacé click para elegir un PDF, .txt o .md"}
               {documento.tipo === "subiendo" && `Subiendo ${documento.nombre}...`}

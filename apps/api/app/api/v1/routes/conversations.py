@@ -28,8 +28,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.v1.deps import AdminKey, DbSession
 from app.core.config import settings
 from app.models.tenant import Tenant
-from app.schemas.chat import ConversationRead, ManualModeStart, MessageRead
-from app.services import conversaciones
+from app.schemas.chat import (
+    ConversationRead,
+    ManualModeStart,
+    MessageRead,
+    RespuestaManual,
+)
+from app.services import conversaciones, responder
 
 router = APIRouter(prefix="/tenants/{tenant_id}/conversations", tags=["conversations"])
 
@@ -71,6 +76,37 @@ async def read_messages(
         return await conversaciones.listar_mensajes(db, tenant_id, conversation_id, limite=limite)
     except conversaciones.ConversacionNoEncontrada as exc:
         raise _no_encontrada() from exc
+
+
+@router.post(
+    "/{conversation_id}/messages",
+    response_model=MessageRead,
+    status_code=status.HTTP_201_CREATED,
+)
+async def responder_a_mano(
+    tenant_id: uuid.UUID,
+    conversation_id: uuid.UUID,
+    payload: RespuestaManual,
+    db: DbSession,
+    _: AdminKey,
+) -> MessageRead:
+    """Le contesta al cliente final en nombre del negocio, desde el panel.
+
+    Ademas de enviar, pausa el bot y da por atendida la derivacion: contestar a
+    mano es la forma mas fuerte de decir "esto lo atiendo yo". El detalle de
+    por que esas tres cosas van juntas esta en services/responder.py.
+
+    409 y no 400 para los rechazos: no esta mal escrita la peticion, es el
+    estado de la conversacion el que no admite un envio ahora (la ventana de
+    24 h vencida es el caso normal, no un error de programacion).
+    """
+    tenant = await _tenant_o_404(db, tenant_id)
+    try:
+        return await responder.responder(db, tenant, conversation_id, payload.texto)
+    except conversaciones.ConversacionNoEncontrada as exc:
+        raise _no_encontrada() from exc
+    except responder.NoSePuedeResponder as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
 
 
 @router.post("/{conversation_id}/manual", response_model=ConversationRead)
