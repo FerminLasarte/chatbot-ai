@@ -4,12 +4,14 @@ import { revalidatePath } from "next/cache";
 
 import {
   AccesoRevocado,
+  guardarMiFicha as guardarFichaEnLaApi,
   pausarMiBot,
   reanudarMiBot,
   responderYoMismo,
   verMiConversacion,
   type MensajeDelHilo,
 } from "@/lib/portal";
+import { fichaDesdeFormulario } from "@/lib/ficha";
 import { claveDelPortal } from "@/lib/sesion-portal";
 
 export type EstadoPortal = { error?: string; ok?: string };
@@ -131,4 +133,31 @@ export async function responderYo(
     if (e instanceof AccesoRevocado) return { error: SIN_ACCESO };
     return { error: e instanceof Error ? e.message : "No se pudo enviar el mensaje." };
   }
+}
+
+
+/**
+ * Guarda la ficha del negocio.
+ *
+ * La clave sale de la cookie, como todas las de este archivo: lo unico que se
+ * acepta del formulario son los campos de la ficha, y la API los valida antes
+ * de escribirlos (ver `app/schemas/negocio.py`). Un 422 vuelve como texto para
+ * que el duenio pueda arreglarlo, no como un error tecnico.
+ */
+export async function guardarMiFicha(
+  _estado: EstadoPortal,
+  form: FormData,
+): Promise<EstadoPortal> {
+  const clave = await claveDelPortal();
+  if (!clave) return { error: SIN_ACCESO };
+
+  try {
+    await guardarFichaEnLaApi(clave, fichaDesdeFormulario(form));
+  } catch (e) {
+    if (e instanceof AccesoRevocado) return { error: SIN_ACCESO };
+    return { error: e instanceof Error ? e.message : "No se pudieron guardar los datos." };
+  }
+
+  revalidatePath("/mi-negocio/datos");
+  return { ok: "Listo. Tu asistente ya contesta con estos datos." };
 }

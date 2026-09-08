@@ -1,12 +1,12 @@
 import { ListaDeConversaciones, type FilaDeConversacion } from "@/components/conversaciones";
 import { EnVivo } from "@/components/en-vivo";
-import { InterruptorDeTema } from "@/components/tema";
 import { Bloque, claseCampoAngosto } from "@/components/ui";
 import { cuantasEsperan, type ConversacionEnLista } from "@/lib/conversaciones";
 import { duracion } from "@/lib/duracion";
 import { AccesoRevocado, listarMisConversaciones, verMiNegocio } from "@/lib/portal";
 import { claveDelPortal } from "@/lib/sesion-portal";
 import { pausarBot, reanudarBot, responderYo, traerMiHilo } from "./acciones";
+import { EncabezadoDelPortal, Marco, SinAcceso } from "./marco";
 import { Boton, FormularioPortal } from "./ui";
 
 // Esta pagina la abre el duenio de la PyME, no la agencia. Junto con
@@ -23,31 +23,6 @@ export const metadata = {
   // Una pagina a la que se entra con un link no tiene por que estar en Google.
   robots: { index: false, follow: false },
 };
-
-function Marco({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="flex-1 px-4 py-10 sm:py-14">
-      <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">{children}</div>
-    </div>
-  );
-}
-
-/** Pantalla de "no puedo dejarte pasar", redactada para alguien no tecnico.
- *
- *  ★ No explica el error: dice que hacer. A quien abre un link vencido no le
- *  sirve saber que su clave fue revocada; le sirve saber a quien pedirle otro. */
-function SinAcceso({ titulo, detalle }: { titulo: string; detalle: string }) {
-  return (
-    <Marco>
-      <section className="rounded-panel border border-borde bg-superficie p-6 shadow-panel sm:p-8">
-        <h1 className="font-titulo text-xl font-semibold tracking-tight text-texto">
-          {titulo}
-        </h1>
-        <p className="mt-2 text-sm text-texto-suave">{detalle}</p>
-      </section>
-    </Marco>
-  );
-}
 
 export default async function MiNegocio({
   searchParams,
@@ -127,29 +102,25 @@ export default async function MiNegocio({
 
   return (
     <Marco>
-      <header className="flex flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0">
-          <h1 className="font-titulo text-3xl font-semibold tracking-tight text-texto">
-            {negocio.nombre}
-          </h1>
-          {/* ★ La linea de abajo dice como viene, no que es la pagina. Quien la
-              abre ya sabe que es su negocio; lo que necesita saber es si hay
-              alguien esperandolo ahora mismo. */}
-          <p className="mt-1 text-sm text-texto-suave">
-            {esperando > 0 ? (
-              <span className="font-medium text-alerta">
-                {esperando === 1
-                  ? "1 persona está esperando que la atiendas"
-                  : `${esperando} personas están esperando que las atiendas`}
-                {masVieja !== undefined && ` · la que más, hace ${duracion(masVieja)}`}
-              </span>
-            ) : (
-              "Todo atendido. Estas son las conversaciones de tu asistente."
-            )}
-          </p>
-        </div>
-        <InterruptorDeTema />
-      </header>
+      <EncabezadoDelPortal
+        nombre={negocio.nombre}
+        esperando={esperando}
+        estado={
+          /* ★ La linea de abajo dice como viene, no que es la pagina. Quien la
+             abre ya sabe que es su negocio; lo que necesita saber es si hay
+             alguien esperandolo ahora mismo. */
+          esperando > 0 ? (
+            <span className="font-medium text-alerta">
+              {esperando === 1
+                ? "1 persona está esperando que la atiendas"
+                : `${esperando} personas están esperando que las atiendas`}
+              {masVieja !== undefined && ` · la que más, hace ${duracion(masVieja)}`}
+            </span>
+          ) : (
+            "Todo atendido. Estas son las conversaciones de tu asistente."
+          )
+        }
+      />
 
       <Bloque
         titulo="Conversaciones"
