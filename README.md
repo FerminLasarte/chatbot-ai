@@ -81,6 +81,10 @@ cd apps/api && uv run ruff check . && uv run mypy app && uv run pytest
 
 ## Reglas del proyecto
 
+Como se escribe el codigo esta en [CLAUDE.md](CLAUDE.md); como se ve y se siente
+el producto, en [docs/design.md](docs/design.md). Lo que sigue son las cuatro
+reglas que no se rompen nunca:
+
 - **El System Prompt de cada cliente vive en la base de datos**, no en archivos.
   `app/ai/prompts/` contiene solo las plantillas base del motor, versionadas en Git.
 - **Toda busqueda vectorial filtra por `tenant_id`.** Ver `app/ai/rag/retriever.py`

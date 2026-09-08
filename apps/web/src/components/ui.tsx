@@ -10,8 +10,7 @@
 // ★ SIN "use client" A PROPOSITO
 // Estos componentes los usan paginas de servidor. Un modulo marcado con
 // "use client" exporta referencias, no valores: interpolarlas en un template
-// string deja el className en basura sin que TypeScript diga nada (ver la nota
-// larga en lib/estilos.ts).
+// string deja el className en basura sin que TypeScript diga nada.
 
 type Variante = "principal" | "suave" | "peligro";
 
