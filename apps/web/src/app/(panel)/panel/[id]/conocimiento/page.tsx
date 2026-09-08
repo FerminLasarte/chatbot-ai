@@ -18,7 +18,7 @@ export default async function Conocimiento({ params }: { params: Promise<{ id: s
     <>
       <Bloque
         titulo="Comportamiento"
-        ayuda="Lo que el bot tiene que ser y cómo responder. Se aplica al instante, sin volver a desplegar."
+        ayuda="Lo que el bot tiene que ser y cómo responder. Los horarios, la dirección y los medios de pago no van acá: se cargan en Negocio."
       >
         <Formulario accion={guardarPrompt} className="flex flex-col gap-3">
           <input type="hidden" name="id" value={id} />

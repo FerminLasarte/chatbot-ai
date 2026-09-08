@@ -1,5 +1,7 @@
 import "server-only";
 
+import type { Ficha } from "@/lib/ficha";
+
 // Las rutas del portal del cliente: las usa el DUENIO DEL NEGOCIO, no la agencia.
 //
 // ★ Este archivo esta separado de lib/api.ts a proposito, por el mismo motivo
@@ -137,4 +139,21 @@ export const responderYoMismo = (clave: string, conversacionId: string, texto: s
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ texto }),
+  });
+
+/**
+ * La ficha de datos del negocio: lo que el asistente sabe y contesta.
+ *
+ * Es LA MISMA que ve la agencia en su panel (ver lib/api.ts). Un solo dato con
+ * dos puertas: cuando el duenio corrige un horario, la agencia lo ve corregido
+ * sin que nadie tenga que avisar.
+ */
+export const verMiFicha = (clave: string) => pedir<Ficha>(clave, "/ficha");
+
+/** PUT: reemplaza la ficha entera, que es lo que permite BORRAR un horario. */
+export const guardarMiFicha = (clave: string, ficha: Ficha) =>
+  pedir<Ficha>(clave, "/ficha", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(ficha),
   });

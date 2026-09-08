@@ -31,7 +31,7 @@ from app.ai.prompts.builder import build_system_blocks, build_user_turn
 from app.ai.rag.retriever import search
 from app.core.config import settings
 from app.models.tenant import Conversation, Message, Tenant
-from app.services import quota
+from app.services import ficha, quota
 
 logger = logging.getLogger(__name__)
 
@@ -102,7 +102,10 @@ async def answer(
     messages: list[MessageParam] = [*historia]
     messages.append(MessageParam(role="user", content=build_user_turn(question, chunks)))
 
-    respuesta = await complete(build_system_blocks(tenant.system_prompt), messages)
+    # La ficha viaja en la fila del tenant, que ya esta cargada: componerla
+    # en el prompt no cuesta una consulta mas por mensaje.
+    system = build_system_blocks(tenant.system_prompt, ficha.leer(tenant))
+    respuesta = await complete(system, messages)
 
     texto, deriva = separar_derivacion(respuesta.text)
 

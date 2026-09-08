@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 
 import * as api from "@/lib/api";
+import { fichaDesdeFormulario } from "@/lib/ficha";
 import { cerrarSesion, crearSesion, haySesion, passwordCorrecta } from "@/lib/session";
 
 export type Estado = { error?: string; ok?: string; clave?: string; link?: string };
@@ -93,6 +94,21 @@ export async function guardarLimite(_estado: Estado, form: FormData): Promise<Es
   }
   revalidatePath(`/panel/${id}`);
   return { ok: "Tope actualizado." };
+}
+
+// --- La ficha del negocio ---
+
+export async function guardarFicha(_estado: Estado, form: FormData): Promise<Estado> {
+  await exigirSesion();
+  const id = String(form.get("id") ?? "");
+
+  try {
+    await api.guardarFicha(id, fichaDesdeFormulario(form));
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "no se pudo guardar" };
+  }
+  revalidatePath(`/panel/${id}/negocio`);
+  return { ok: "Datos del negocio guardados. El asistente los usa desde la próxima respuesta." };
 }
 
 // --- Documentos ---

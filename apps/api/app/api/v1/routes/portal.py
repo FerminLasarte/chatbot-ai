@@ -1,13 +1,14 @@
-"""El portal del duenio del negocio: ver sus conversaciones y pausar su bot.
+"""El portal del duenio: sus conversaciones, pausar su bot y editar su ficha.
 
 QUE ES ESTO
 -----------
 El cliente de la agencia no tiene usuario en el panel —el panel es de la
 agencia, con una contrasena compartida que ve a TODOS los clientes—. Pero
-necesita poder hacer dos cosas por su cuenta, sin llamar a nadie: mirar quien le
-escribio y callar al bot en una conversacion para atenderla el mismo.
+necesita poder hacer tres cosas por su cuenta, sin llamar a nadie: mirar quien
+le escribio, callar al bot en una conversacion para atenderla el mismo, y
+corregir los datos de su negocio cuando cambian.
 
-Estas rutas son exactamente esas dos cosas y ninguna mas.
+Estas rutas son exactamente esas tres cosas y ninguna mas.
 
 ★ POR QUE NO HAY `tenant_id` EN NINGUNA URL DE ESTE ARCHIVO
 -----------------------------------------------------------
@@ -23,12 +24,26 @@ otro cliente habria que tener la clave de otro cliente.
 
 QUE PUEDE HACER EL QUE TENGA LA CLAVE
 -------------------------------------
-Listar las conversaciones de SU negocio y correr la fecha de `pausada_hasta` de
-una de ellas. No lee documentos, no toca el prompt, no ve el consumo ni el tope,
-no puede borrar nada y no puede emitir ni revocar claves. El peor caso de una
-clave filtrada es que un tercero vea los numeros de telefono y los adelantos de
-mensajes de ese negocio, y le pause el bot unas horas —molesto y reversible—.
-Si pasa, la agencia revoca la clave desde el panel y emite otra.
+Listar las conversaciones de SU negocio, correr la fecha de `pausada_hasta` de
+una de ellas, y leer y reescribir la ficha de datos de su negocio. No lee
+documentos, no toca el prompt, no ve el consumo ni el tope, no puede borrar
+conversaciones y no puede emitir ni revocar claves.
+
+★ ESCRIBIR LA FICHA ES EL PERMISO MAS FUERTE QUE TIENE ESTA CLAVE, y se sumo a
+sabiendas. Antes, el peor caso de una clave filtrada era que un tercero viera
+los telefonos y los adelantos de los mensajes de ese negocio y le pausara el bot
+unas horas —molesto y reversible—. Ahora tambien puede cambiar lo que el bot le
+CONTESTA a los clientes de ese negocio: precios, horarios, envios.
+
+Se acepto porque la alternativa —que cada cambio de horario pase por la
+agencia— es lo que hoy hace que el producto no escale, y porque el dano sigue
+acotado al negocio duenio de la clave, es visible (se ve en la ficha) y
+reversible. El remedio es el mismo de siempre y es inmediato: la agencia emite
+otro link desde el panel, y el anterior deja de servir en el acto.
+
+Lo que la clave sigue SIN poder tocar es el `system_prompt` y los documentos:
+la ficha entra al modelo como dato entre etiquetas (ver `ai/prompts/negocio.py`),
+no como instrucciones.
 """
 
 import uuid
@@ -44,7 +59,8 @@ from app.schemas.chat import (
     PortalTenant,
     RespuestaManual,
 )
-from app.services import conversaciones, responder
+from app.schemas.negocio import FichaNegocio
+from app.services import conversaciones, ficha, responder
 
 router = APIRouter(prefix="/portal", tags=["portal"])
 
@@ -158,3 +174,34 @@ async def reanudar_mi_bot(
         return await conversaciones.reanudar(db, tenant.id, conversation_id)
     except conversaciones.ConversacionNoEncontrada as exc:
         raise _no_encontrada() from exc
+
+
+# ---------------------------------------------------------------------------
+# La ficha del negocio
+#
+# Sin `tenant_id` en la URL, igual que todo lo de arriba: el tenant sale de la
+# clave. Un id en el path seria un dato que elige quien manda la peticion.
+# ---------------------------------------------------------------------------
+
+
+@router.get("/ficha", response_model=FichaNegocio)
+async def mi_ficha(tenant: CurrentTenant, _: PortalKey) -> FichaNegocio:
+    """Los datos que el bot sabe del negocio. Vacia si nunca cargo nada."""
+    return ficha.leer(tenant)
+
+
+@router.put("/ficha", response_model=FichaNegocio)
+async def guardar_mi_ficha(
+    payload: FichaNegocio, tenant: CurrentTenant, db: DbSession, _: PortalKey
+) -> FichaNegocio:
+    """Reemplaza la ficha entera y devuelve como quedo.
+
+    PUT y no PATCH a proposito: el formulario manda la ficha completa, y un
+    merge parcial sobre listas dejaria sin forma de BORRAR un horario o un
+    bloque. La ultima escritura gana; con dos editores posibles —el duenio y la
+    agencia— y cambios cada varios meses, no hace falta mas.
+
+    El cliente ve el efecto en la respuesta siguiente del bot: la ficha se
+    compone en el prompt, no hace falta desplegar nada.
+    """
+    return await ficha.guardar(db, tenant, payload)

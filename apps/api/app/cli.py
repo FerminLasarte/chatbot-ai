@@ -73,6 +73,30 @@ def crear_clave_admin(nombre: str = typer.Option(..., "--nombre", "-n")) -> None
     typer.echo("")
 
 
+def _escribir_env(archivo: Path, valores: dict[str, str]) -> None:
+    """Actualiza esas claves en el .env y deja el RESTO del archivo intacto.
+
+    ★ Antes esto hacia `write_text()` y se llevaba puesto todo lo demas. En un
+    .env.local con `API_URL`, `ADMIN_API_KEY` y la contrasena del panel, correr
+    este comando dejaba el entorno de desarrollo sin nada de eso -y sin aviso:
+    el archivo esta en .gitignore, asi que no hay diff que lo delate-.
+    """
+    lineas: list[str] = []
+    if archivo.exists():
+        lineas = archivo.read_text().splitlines()
+
+    for clave, valor in valores.items():
+        nueva = f"{clave}={valor}"
+        for i, linea in enumerate(lineas):
+            if linea.startswith(f"{clave}="):
+                lineas[i] = nueva
+                break
+        else:
+            lineas.append(nueva)
+
+    archivo.write_text("\n".join(lineas) + "\n")
+
+
 @app.command("crear-tenant-demo")
 def crear_tenant_demo(
     nombre: str = typer.Option("Demo", "--nombre", "-n"),
@@ -126,7 +150,10 @@ def crear_tenant_demo(
     raw, tenant_id = asyncio.run(_run())
 
     web_env = Path(__file__).resolve().parents[2] / "web" / ".env.local"
-    web_env.write_text(f"NEXT_PUBLIC_API_URL=http://localhost:8000\nNEXT_PUBLIC_API_KEY={raw}\n")
+    _escribir_env(
+        web_env,
+        {"NEXT_PUBLIC_API_URL": "http://localhost:8000", "NEXT_PUBLIC_API_KEY": raw},
+    )
 
     typer.echo("")
     typer.secho(f"  Tenant '{slug}' listo ({tenant_id}).", fg=typer.colors.GREEN, bold=True)

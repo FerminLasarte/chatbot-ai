@@ -36,7 +36,8 @@ from app.schemas.chat import (
     WhatsAppRead,
     WhatsAppUpdate,
 )
-from app.services import onboarding, quota, resumen, whatsapp
+from app.schemas.negocio import FichaNegocio
+from app.services import ficha, onboarding, quota, resumen, whatsapp
 
 router = APIRouter(prefix="/tenants", tags=["tenants"])
 
@@ -389,6 +390,25 @@ async def update_prompt_admin(
     await db.commit()
     await db.refresh(tenant)
     return _to_read(tenant)
+
+
+@router.get("/{tenant_id}/ficha", response_model=FichaNegocio)
+async def read_ficha_admin(tenant_id: uuid.UUID, db: DbSession, _: AdminKey) -> FichaNegocio:
+    """La ficha de datos del cliente, la misma que edita el duenio en su portal.
+
+    Es una sola ficha con dos puertas (ver `services/ficha.py`): la agencia la
+    completa en el alta y el duenio la corrige despues, sin que ninguno tenga
+    que avisarle al otro.
+    """
+    return ficha.leer(await _tenant_o_404(db, tenant_id))
+
+
+@router.put("/{tenant_id}/ficha", response_model=FichaNegocio)
+async def update_ficha_admin(
+    tenant_id: uuid.UUID, payload: FichaNegocio, db: DbSession, _: AdminKey
+) -> FichaNegocio:
+    """Reemplaza la ficha entera. Mismo criterio que en el portal: no hay merge."""
+    return await ficha.guardar(db, await _tenant_o_404(db, tenant_id), payload)
 
 
 # ---------------------------------------------------------------------------
