@@ -34,6 +34,22 @@
  * scrollbars y a los controles nativos del navegador.
  * ======================================================================== */
 
+/* ★ LA UNICA EXCEPCION A "ningun color escrito a mano".
+ *
+ * El boton que abre el popup de Facebook en el alta va en el azul de Meta, y no
+ * en el acento del producto, a proposito: quien lo toca esta por ver una
+ * ventana de Facebook, y que el boton se parezca a lo que viene despues es lo
+ * que hace que no lo cierre pensando que se equivoco de lugar.
+ *
+ * No cambia con la piel ni con el tema porque es una marca ajena: el azul de
+ * Meta es ese y no tiene version clara ni oscura. Vive aca, con nombre, para
+ * que sea una decision visible y no un `#1877F2` perdido en un className.
+ */
+:root {
+  --azul-meta: #1877f2;
+  --azul-meta-fuerte: #166fe5;
+}
+
 /* Sin `data-tema`, el sistema decide. Con el, decide el usuario. Es lo unico
  * que necesita el interruptor manual: no reescribe ningun token. */
 :root {
@@ -169,6 +185,9 @@
   --shadow-panel: var(--sombra-panel);
   --shadow-flotante: var(--sombra-flotante);
 
+  --color-azul-meta: var(--azul-meta);
+  --color-azul-meta-fuerte: var(--azul-meta-fuerte);
+
   /* Las fuentes las inyecta el layout de cada piel: cada lado carga las suyas
    * y ninguna pantalla descarga tipografia que no va a usar. */
   --font-sans: var(--fuente-cuerpo);
@@ -213,6 +232,28 @@ body {
   html {
     font-size: 18px;
   }
+}
+
+/* ★ EL RELOJITO DE `<input type="time">` LO DIBUJA EL NAVEGADOR.
+ *
+ * En Chrome es un icono negro fijo: sobre el fondo oscuro de la consola queda
+ * invisible. Lo que lo arregla es `color-scheme` -que ya esta puesto arriba
+ * para el tema-, porque los controles nativos se pintan segun ese valor; aca
+ * queda solo ajustarle el peso visual, que por defecto compite con el texto de
+ * al lado.
+ *
+ * Es un pseudo-elemento con prefijo y sin equivalente estandar: Firefox y
+ * Safari no dibujan este icono, asi que la regla no les aplica y no rompe nada.
+ */
+input[type="time"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.45;
+  transition: opacity 0.15s ease;
+}
+
+input[type="time"]:hover::-webkit-calendar-picker-indicator,
+input[type="time"]:focus::-webkit-calendar-picker-indicator {
+  opacity: 0.9;
 }
 
 /* El foco por teclado se ve siempre y en el color del acento. Es la unica

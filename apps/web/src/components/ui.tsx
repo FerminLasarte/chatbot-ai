@@ -73,6 +73,52 @@ export const claseCampo =
  *  entre dos utilidades de ancho por el orden en la hoja, no en el atributo. */
 export const claseCampoAngosto = claseCampo.replace("w-full ", "");
 
+/**
+ * Un campo de hora.
+ *
+ * ★ POR QUE ES UN COMPONENTE Y NO UN `<input type="time" className={claseCampo}>`
+ * Un campo de hora no es un campo de texto con otro `type`: el navegador le
+ * dibuja adentro su propio reloj, su propio separador y sus propias flechas, y
+ * cada uno lo hace distinto. Si no se decide una vez como se ve, la primera
+ * pantalla que lo use hereda lo que venga -en Chrome un icono negro que en
+ * modo oscuro queda invisible- y la segunda lo corrige a mano de otra forma.
+ *
+ * El ancho es fijo y no `w-full`: un campo de hora estirado a todo el ancho de
+ * una columna parece un campo de texto vacio, y en una fila de horario van dos
+ * seguidos. La medida sale del caso MAS ANCHO, que es el reloj de 12 h
+ * ("09:00 a. m." + el iconito): con el ancho justo para las 24 h, un navegador
+ * en ingles corta el "p. m." y nadie se entera hasta que lo abre un cliente.
+ *
+ * `step={60}` deja los segundos afuera. Sin eso, algunos navegadores muestran
+ * "09:00:00" y le piden a alguien que cargue los segundos de su horario de
+ * atencion.
+ */
+export function CampoDeHora({
+  name,
+  defaultValue,
+  etiqueta,
+  required,
+}: {
+  name: string;
+  defaultValue?: string;
+  /** Obligatoria: en una fila de horarios hay dos campos iguales al lado y sin
+   *  esto un lector de pantalla dice "hora, hora". */
+  etiqueta: string;
+  required?: boolean;
+}) {
+  return (
+    <input
+      type="time"
+      name={name}
+      defaultValue={defaultValue}
+      required={required}
+      step={60}
+      aria-label={etiqueta}
+      className={`tabular w-[9.5rem] rounded-control border border-borde bg-superficie px-2.5 py-1.5 text-sm text-texto transition-colors hover:border-borde-fuerte focus:border-acento focus:outline-none`}
+    />
+  );
+}
+
 /** La etiqueta de un campo. Va ARRIBA del campo, siempre visible: un
  *  placeholder que hace de etiqueta desaparece justo cuando alguien esta
  *  escribiendo y necesita confirmar que esta llenando lo que cree. */

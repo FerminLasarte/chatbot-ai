@@ -78,6 +78,15 @@ Tres reglas que se siguen de ahi:
    oscuro el acento se aclara, y un blanco fijo deja letras blancas sobre un
    fondo claro.
 
+**Hay una sola excepcion a "ningun color escrito a mano", y esta en
+`globals.css` con nombre**: `--azul-meta`, el azul de Facebook del boton que
+abre el popup del alta. Va asi a proposito —quien lo toca esta por ver una
+ventana de Facebook, y que el boton se parezca a lo que viene despues es lo que
+hace que no la cierre pensando que se equivoco— y no cambia con la piel ni con
+el tema porque es una marca ajena. Si aparece una segunda excepcion, va al lado
+de esa y con su motivo; lo que no puede volver a haber es un `#1877F2` suelto
+adentro de un `className`.
+
 ### El modo oscuro: `light-dark()`, no un `@media` por piel
 
 Cada token declara sus dos valores en la misma linea:
@@ -100,8 +109,17 @@ obliga a elegir en la primera visita y despues no deja volver a "que decida el
 sistema", que es la opcion correcta para la mayoria.
 
 El guion que aplica la eleccion guardada corre **antes del primer pintado**
-(`lib/tema.ts`). Adentro de un `useEffect`, quien eligio oscuro veria un
-fogonazo blanco en cada navegacion.
+(`lib/tema.ts`), y va en el `<head>` de cada layout raiz: el navegador lo
+ejecuta mientras parsea el head, o sea antes de pintar la primera linea. Es el
+patron que documenta Next (`guides/preventing-flash-before-hydration`). Adentro
+de un `useEffect`, quien eligio oscuro veria un fogonazo blanco en cada
+navegacion; adentro del `<body>`, React avisa que un `<script>` renderizado por
+el no se ejecuta cuando el arbol se rehace del lado del cliente.
+
+El interruptor (`components/tema.tsx`) lee con `useSyncExternalStore` y no con
+`useState` + `useEffect`: el valor no es estado de React, es un atributo del
+`<html>` que ya viene puesto. Copiarlo a un estado crea una segunda fuente de
+verdad y un render de mas en cada carga.
 
 En pantallas grandes sube el `font-size` del documento (17 px desde 1536 px,
 18 px desde 1920 px). Como Tailwind mide en rem, eso agranda texto, padding y
@@ -113,6 +131,8 @@ separaciones **en proporcion**, sin tocar ninguna pantalla.
 | --- | --- |
 | `claseBoton(variante, tamanio)` | `principal`, `suave`, `fantasma`, `peligro` |
 | `claseCampo` / `claseCampoAngosto` | como se ve un campo |
+| `CampoDeHora` | un `<input type="time">` con la apariencia ya decidida |
+| `Etiqueta` | el nombre de un campo, y su linea de ayuda |
 | `Tarjeta` | el bloque sobre el que se apoya todo |
 | `Bloque` | tarjeta con titulo, ayuda **arriba**, acciones y pie |
 | `Encabezado` | el titulo de una pantalla y su accion principal |
@@ -124,6 +144,22 @@ separaciones **en proporcion**, sin tocar ninguna pantalla.
 **No tienen `"use client"` a proposito**: los usan paginas de servidor, y un
 modulo marcado como cliente exporta referencias, no valores —interpolar una en
 un template string deja el `className` en basura sin que TypeScript diga nada—.
+
+**`CampoDeHora` es un componente y no un `className`** porque un campo de hora no
+es un campo de texto con otro `type`: el navegador le dibuja adentro su propio
+reloj, y cada uno lo hace distinto. En Chrome ese icono es negro fijo, asi que
+en la piel oscura desaparece; lo que lo arregla es `color-scheme` —el mismo que
+resuelve el tema—, porque los controles nativos se pintan segun ese valor. El
+ancho sale del caso mas ancho, que es el reloj de 12 h: con la medida justa para
+las 24 h, un navegador en ingles corta el "p. m." y nadie se entera.
+
+**Las listas que crecen usan `Repetible` / `FilaRepetible`**
+(`components/repetible.tsx`), no una implementacion por pantalla. Son
+presentacionales: el estado de las filas vive arriba, en quien conoce la forma
+de los datos. Traen resueltos los tres estados que siempre se olvidan —vacia
+(invitando a cargar, nunca "sin datos"), llena (el boton se va y se dice por
+que) y el boton de quitar con un `aria-label` que nombra **cual** quita, porque
+diez botones que dicen "Quitar" son inservibles con un lector de pantalla—.
 
 Los iconos viven en `components/iconos.tsx`, dibujados a mano: son doce, pesan
 menos que el `import` que los buscaria, y asi todos comparten el mismo grosor de
@@ -139,8 +175,17 @@ llama a quien contesto a mano, que acciones van al pie). Hoy:
 - `conversaciones.tsx` — la lista, con busqueda y filtros.
 - `hilo.tsx` — el hilo, la atribucion de cada mensaje y la caja de respuesta.
 - `panel-lateral.tsx` — el panel que se abre al costado.
+- `navegacion.tsx` — la barra de secciones, con un contador opcional al lado.
+- `repetible.tsx` — una lista a la que se le agregan y se le quitan filas.
+- `metricas.tsx` — la fila de numeros que encabeza una pantalla.
 - `en-vivo.tsx` — el refresco automatico.
 - `tema.tsx` — el interruptor de tema.
+
+`navegacion.tsx` nacio adentro del panel, donde un cliente tiene cinco
+secciones. Esta aca porque el portal va a tener dos (Conversaciones y Mi
+negocio) y necesita exactamente la misma: una copia al lado es como el mismo
+boton termina con dos grises. Cada lado le pasa sus secciones y el orden, que es
+**el de uso** y no el alfabetico.
 
 Lo que **no** se comparte es el tipo de estado de cada lado ni sus Server
 Actions: `app/(panel)/panel/ui.tsx` y `app/(publico)/mi-negocio/ui.tsx` tienen

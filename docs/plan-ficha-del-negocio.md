@@ -262,18 +262,26 @@ Piezas de dentro del archivo (todas privadas salvo la principal):
 
 - `<CamposDeLaFicha ficha />` — el componente que se exporta.
 - `EditorDeHorarios` — una fila por dia: el nombre, "Cerrado", y los tramos con
-  `<input type="time">`; un `+` para agregar el segundo tramo.
+  `<CampoDeHora>`; un `+` para agregar el segundo tramo.
 - `BloquesExtra` — lista de titulo + texto, con agregar y quitar.
+
+Las dos piezas que esto necesitaba **ya existen** desde el rediseno, no hay que
+inventarlas: `Repetible` / `FilaRepetible` (`components/repetible.tsx`) para las
+listas que crecen, y `CampoDeHora` (`components/ui.tsx`) para la hora. Ver
+[docs/design.md](design.md#los-ladrillos).
 
 Reusa `Bloque`, `claseCampo`, `claseBoton` y `Chip` de `components/ui.tsx`. No
 se escribe **ni un color a mano** (ver el checklist de
 [docs/design.md](design.md#checklist-antes-de-dar-una-pantalla-por-terminada)).
 
-**Refactor que entra aca**, no despues: `app/panel/[id]/nav.tsx` pasa a
-`components/nav-secciones.tsx`, generico y con la lista de secciones por props,
-porque el portal necesita exactamente esa navegacion. Es el caso que la regla
-del repo pide compartir: la misma barra escrita dos veces divergiria a la
-primera correccion.
+**Este refactor ya esta hecho** (rediseno de 2026-09-08): la navegacion vive en
+`components/navegacion.tsx`, es generica y recibe las secciones por props.
+`app/(panel)/panel/[id]/nav.tsx` quedo como la lista de secciones del panel y
+nada mas. El portal la usa igual, pasandole las suyas: **no hay que crear
+ningun `nav-secciones.tsx`**.
+
+Ademas acepta un numero al costado de una seccion (`cuantos`), que el panel usa
+para las conversaciones que esperan.
 
 ### Paso 6 — El panel de la agencia
 

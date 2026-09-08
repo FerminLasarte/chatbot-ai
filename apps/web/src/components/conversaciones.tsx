@@ -198,7 +198,11 @@ function Fila({
         conversacion.derivada ? "shadow-[inset_3px_0_0_var(--alerta)]" : ""
       }`}
     >
-      <span className="min-w-0 lg:flex-1">
+      {/* ★ `lg:min-w-[12rem]`: sin un piso, esta columna es la unica flexible y
+          se come toda la compresion. En una fila con dos chips el numero
+          quedaba en "+5…" y el mensaje en "Hol…" -justo en las filas que
+          tienen algo que decir, que son las que llevan mas chips-. */}
+      <span className="min-w-0 lg:min-w-[12rem] lg:flex-1">
         <span className="tabular block truncate text-sm font-medium text-texto">{quien}</span>
         {conversacion.ultimo_mensaje && (
           <span className="mt-0.5 block truncate text-sm text-texto-suave">
@@ -207,7 +211,9 @@ function Fila({
         )}
       </span>
 
-      <span className="flex flex-wrap items-center gap-1.5 lg:shrink-0">
+      {/* Los chips ceden antes que el texto: envuelven en dos lineas en vez de
+          aplastar a quien escribio. */}
+      <span className="flex flex-wrap items-center gap-1.5 lg:max-w-[26rem] lg:justify-end">
         {conversacion.derivada && (
           <Chip tono="alerta">
             Pidieron una persona

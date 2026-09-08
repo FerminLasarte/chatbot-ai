@@ -10,7 +10,7 @@ import { ACTUALIZADO, EMPRESA } from "@/lib/empresa";
 
 export default function LegalLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex-1 bg-white px-4 py-12 dark:bg-black">
+    <div className="flex-1 bg-fondo px-4 py-12">
       <div className="mx-auto w-full max-w-2xl">
         <article
           className="text-sm leading-relaxed text-texto
@@ -24,7 +24,7 @@ export default function LegalLayout({ children }: { children: React.ReactNode })
           {children}
         </article>
 
-        <footer className="mt-12 border-t border-borde pt-6 text-xs text-texto-suave dark:border-borde">
+        <footer className="mt-12 border-t border-borde pt-6 text-xs text-texto-suave">
           <p className="mb-2">Ultima actualizacion: {ACTUALIZADO}</p>
           <nav className="flex flex-wrap gap-x-4 gap-y-1">
             <Link href="/privacidad" className="hover:underline">
