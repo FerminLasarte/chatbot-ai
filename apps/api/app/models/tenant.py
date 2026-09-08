@@ -8,7 +8,7 @@ import uuid
 from datetime import UTC, datetime
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text, func
+from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text, func, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -44,6 +44,21 @@ class Tenant(Base):
     # Sin unique: una misma WABA puede tener varios numeros, y nada impide que
     # dos clientes nuestros cuelguen del mismo negocio.
     whatsapp_waba_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # La ficha de datos del negocio: horarios, direccion, envios, medios de pago.
+    # Es lo que el duenio edita desde su portal, sin tocar el prompt.
+    #
+    # ★ JSONB y no una tabla 1-1 aparte. La ficha se lee en CADA mensaje
+    # entrante para componer el prompt, y aca el tenant ya viene cargado: una
+    # tabla al lado sumaria una consulta (o un eager load) por mensaje a cambio
+    # de nada, porque la ficha se lee y se escribe siempre entera y no se
+    # consulta nunca por campo.
+    #
+    # ★ La forma la garantiza `schemas/negocio.py`, no Postgres. Es la
+    # contrapartida de elegir JSONB: nada escribe aca sin pasar por
+    # `FichaNegocio`, y el unico camino de escritura es `services/ficha.py`.
+    business_profile: Mapped[dict] = mapped_column(
+        JSONB, default=dict, server_default=text("'{}'::jsonb")
+    )
     settings_json: Mapped[dict] = mapped_column(JSONB, default=dict)
     is_active: Mapped[bool] = mapped_column(default=True)
 
