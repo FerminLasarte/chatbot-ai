@@ -5,17 +5,22 @@ Hay cuatro niveles de confianza y NO pueden compartir credencial:
   admin          la agencia: crear/listar clientes y emitir claves. Vive en tu servidor.
   tenant         el dashboard de un cliente: editar su prompt, subir sus documentos.
   chat           el widget web: solo POST /chat. VIAJA EN EL NAVEGADOR, es publica.
-  client_portal  el duenio de la PyME: ver SUS conversaciones y pausar SU bot.
+  client_portal  el duenio de la PyME: ver SUS conversaciones, pausar SU bot y
+                 editar la ficha de datos de SU negocio.
 
 Si el widget usara la misma clave que el dashboard, cualquiera que abra el
 inspector en la web del cliente podria editarle el prompt y leerle los documentos.
 
 ★ `client_portal` es deliberadamente MAS chico que `tenant`, no un alias suyo.
 Una clave `tenant` puede reescribir el prompt del bot y subir documentos; esta
-solo lee conversaciones y corre la fecha de `pausada_hasta`. La diferencia
-importa porque esta clave viaja por WhatsApp o mail hasta el telefono del
-duenio del negocio y se queda ahi: hay que asumir que en algun momento la ve
-alguien mas que el (ver routes/portal.py).
+lee conversaciones, corre la fecha de `pausada_hasta` y reescribe la ficha de
+datos del negocio —horarios, direccion, envios—, que entra al modelo como dato
+y no como instrucciones. La diferencia importa porque esta clave viaja por
+WhatsApp o mail hasta el telefono del duenio del negocio y se queda ahi: hay
+que asumir que en algun momento la ve alguien mas que el.
+
+Escribir la ficha es el permiso mas fuerte que tiene y se sumo a sabiendas: el
+motivo, el dano acotado y el remedio estan en el encabezado de routes/portal.py.
 
 De la clave solo se guarda el hash. El secreto se muestra una unica vez, al
 emitirla. Si se pierde, se revoca y se emite otra.
