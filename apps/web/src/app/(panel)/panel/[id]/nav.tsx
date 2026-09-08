@@ -1,9 +1,6 @@
-"use client";
+import { Navegacion, type Seccion } from "@/components/navegacion";
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-
-// La navegacion de un cliente dentro del panel.
+// Las secciones de un cliente dentro del panel.
 //
 // ★ EL ORDEN NO ES ALFABETICO NI EL DE LA BASE: ES EL DE USO
 // Conversaciones primero porque es a lo que se entra todos los dias. WhatsApp y
@@ -11,6 +8,10 @@ import { usePathname } from "next/navigation";
 // son de una vez cada mucho. La pagina anterior las mostraba a todas apiladas
 // con el mismo peso, y el consumo del mes ocupaba tanto lugar como el hilo que
 // alguien estaba esperando.
+//
+// El dibujo vive en components/navegacion.tsx: cuando el portal del cliente
+// tenga su segunda pantalla va a necesitar la misma pieza, y una copia al lado
+// es como el mismo boton termina con dos grises.
 
 const SECCIONES = [
   { href: "", etiqueta: "Conversaciones" },
@@ -20,30 +21,22 @@ const SECCIONES = [
   { href: "/consumo", etiqueta: "Consumo" },
 ] as const;
 
-export function NavDelCliente({ id }: { id: string }) {
-  const actual = usePathname();
+export function NavDelCliente({
+  id,
+  esperando,
+}: {
+  id: string;
+  /** Cuantas conversaciones piden una persona. Va al lado de "Conversaciones":
+   *  es lo unico del nav que puede estar pidiendo algo mientras alguien mira
+   *  otra seccion. */
+  esperando?: number;
+}) {
   const base = `/panel/${id}`;
+  const secciones: Seccion[] = SECCIONES.map(({ href, etiqueta }) => ({
+    href: `${base}${href}`,
+    etiqueta,
+    cuantos: href === "" ? esperando : undefined,
+  }));
 
-  return (
-    <nav className="-mx-1 flex gap-1 overflow-x-auto lg:mx-0 lg:flex-col lg:overflow-visible">
-      {SECCIONES.map(({ href, etiqueta }) => {
-        const destino = `${base}${href}`;
-        const activa = actual === destino;
-        return (
-          <Link
-            key={href}
-            href={destino}
-            aria-current={activa ? "page" : undefined}
-            className={`shrink-0 rounded-control px-3 py-1.5 text-sm transition-colors ${
-              activa
-                ? "bg-superficie-2 font-medium text-texto"
-                : "text-texto-suave hover:bg-superficie-2 hover:text-texto"
-            }`}
-          >
-            {etiqueta}
-          </Link>
-        );
-      })}
-    </nav>
-  );
+  return <Navegacion secciones={secciones} />;
 }

@@ -3,7 +3,8 @@ import { notFound } from "next/navigation";
 
 import { IconoFlechaIzquierda } from "@/components/iconos";
 import { Chip } from "@/components/ui";
-import { listarClaves, verWhatsApp } from "@/lib/api";
+import { listarClaves, listarConversaciones, verWhatsApp } from "@/lib/api";
+import { cuantasEsperan } from "@/lib/conversaciones";
 import { clienteDelPanel, exigirPanel } from "../guardia";
 import { BarraDelPanel } from "../marco";
 import { NavDelCliente } from "./nav";
@@ -42,10 +43,14 @@ export default async function LayoutDelCliente({
   await exigirPanel();
   const { id } = await params;
 
-  const [cliente, wa, claves] = await Promise.all([
+  // Las cuatro en paralelo: son independientes y en serie sumarian sus
+  // latencias. El layout no se vuelve a renderizar al cambiar de seccion, asi
+  // que esto se paga una vez por cliente y no una por pantalla.
+  const [cliente, wa, claves, conversaciones] = await Promise.all([
     clienteDelPanel(id),
     verWhatsApp(id),
     listarClaves(id),
+    listarConversaciones(id),
   ]);
   if (!cliente) notFound();
 
@@ -81,7 +86,9 @@ export default async function LayoutDelCliente({
       <div className="flex flex-1 flex-col lg:flex-row">
         <aside className="border-borde bg-superficie lg:sticky lg:top-12 lg:h-[calc(100dvh-3rem)] lg:w-52 lg:shrink-0 lg:border-r">
           <div className="px-3 py-3 lg:px-3 lg:py-4">
-            <NavDelCliente id={id} />
+            {/* El numero al lado de Conversaciones es lo unico que puede
+                estar pidiendo algo mientras alguien mira otra seccion. */}
+            <NavDelCliente id={id} esperando={cuantasEsperan(conversaciones)} />
           </div>
         </aside>
 

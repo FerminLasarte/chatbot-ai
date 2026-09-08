@@ -48,11 +48,16 @@ export default function LayoutDelPanel({ children }: { children: React.ReactNode
       // pintura puede diferir de lo que el guion de abajo deja puesto.
       suppressHydrationWarning
     >
-      <body className="flex min-h-full flex-col bg-fondo text-texto">
-        {/* ★ Antes que cualquier contenido: pone `data-tema` antes del primer
-            pintado. Con esto adentro de un efecto, quien eligio oscuro ve un
-            fogonazo blanco en cada navegacion. */}
+      {/* ★ EN <head> Y NO EN <body>, y con dangerouslySetInnerHTML.
+          Es el patron que documenta Next para esto (guides/preventing-flash-
+          before-hydration): el navegador lo ejecuta sincronicamente mientras
+          parsea el head, o sea antes de pintar la primera linea. Adentro del
+          body React avisa -con razon- que un <script> renderizado por el no se
+          ejecuta en las navegaciones del lado del cliente. */}
+      <head>
         <script dangerouslySetInnerHTML={{ __html: GUION_TEMA }} />
+      </head>
+      <body className="flex min-h-full flex-col bg-fondo text-texto">
         {children}
       </body>
     </html>
