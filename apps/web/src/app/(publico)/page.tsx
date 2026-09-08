@@ -50,19 +50,20 @@ export default function Portada() {
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+          {/* ★ ACA NO VA UN LINK AL PANEL, y estuvo un rato. Esta es la
+              puerta publica: un cliente al que se le manda el dominio, o Meta
+              revisando la app, no tienen nada que hacer en una herramienta
+              interna, y publicarla le dice a cualquiera donde esta la puerta.
+              El login tiene una contrasena fuerte pero NO tiene bloqueo por
+              intentos fallidos: solo una espera de 700 ms. Quien necesita el
+              panel lo tiene en favoritos. */}
+          <div className="text-sm">
             <a
               href={`mailto:${EMPRESA.email}`}
               className="font-medium text-acento hover:underline"
             >
               Escribinos
             </a>
-            <span className="text-texto-tenue">&middot;</span>
-            {/* Discreto y sin promesas: quien lo necesita ya sabe que existe, y
-                a quien no, no le dice nada. */}
-            <Link href="/panel" className="text-texto-suave hover:text-texto hover:underline">
-              Panel del equipo
-            </Link>
           </div>
         </main>
 
