@@ -98,9 +98,7 @@ async def responder(
     conversacion = await conversaciones.buscar(db, tenant.id, conversation_id)
 
     if conversacion.channel != CANAL_WHATSAPP:
-        raise NoSePuedeResponder(
-            "por ahora solo se puede contestar por WhatsApp desde aca"
-        )
+        raise NoSePuedeResponder("por ahora solo se puede contestar por WhatsApp desde aca")
 
     # El estado ya calculado del hilo: de ahi sale si la ventana sigue abierta.
     estado = await conversaciones.detalle(db, conversacion)

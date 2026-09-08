@@ -133,9 +133,7 @@ class _Conversaciones:
 _SIN_CONVERSACIONES = _Conversaciones()
 
 
-async def _conversaciones(
-    db: AsyncSession, ahora: datetime
-) -> dict[uuid.UUID, _Conversaciones]:
+async def _conversaciones(db: AsyncSession, ahora: datetime) -> dict[uuid.UUID, _Conversaciones]:
     """Los cuatro numeros de conversaciones, en una sola pasada por la tabla.
 
     `FILTER (WHERE ...)` de Postgres permite contar dos cosas distintas en la

@@ -144,7 +144,7 @@ async def test_el_que_tiene_gente_esperando_va_primero(
 async def test_se_informa_hace_cuanto_espera_la_mas_vieja(
     db: AsyncSession, negocios: dict[str, Tenant]
 ) -> None:
-    """"Espera hace 3 h" y "espera hace 2 min" piden cosas distintas."""
+    """Hace cuanto espera la mas vieja, que es lo que dice si esto es urgente."""
     await _conversacion(db, negocios["zapateria"], espera_hace_horas=3)
     await _conversacion(db, negocios["zapateria"], espera_hace_horas=1)
 
@@ -159,7 +159,7 @@ async def test_se_informa_hace_cuanto_espera_la_mas_vieja(
 async def test_lo_viejo_no_cuenta_como_actividad_de_hoy(
     db: AsyncSession, negocios: dict[str, Tenant]
 ) -> None:
-    """"Activas" es lo que sigue vivo hoy; mas viejo que eso ya es historial."""
+    """Activa es lo que sigue vivo hoy; mas viejo que eso ya es historial."""
     await _conversacion(db, negocios["panaderia"], activa_hace_minutos=30)
     await _conversacion(db, negocios["panaderia"], activa_hace_minutos=60 * 48)
 
