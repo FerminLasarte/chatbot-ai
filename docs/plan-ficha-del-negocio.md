@@ -11,6 +11,17 @@ y revisar solo.
 
 # Punto 1 — Que el duenio edite lo que el bot sabe
 
+> ## ✅ HECHO el 2026-09-08
+>
+> Los siete pasos, verificados en local de punta a punta: el duenio carga sus
+> horarios en `/mi-negocio/datos`, la agencia ve LA MISMA ficha en
+> `/panel/{id}/negocio`, y lo que queda guardado aparece dentro de
+> `<datos_del_negocio>` en el prompt. Se probo que el PUT tambien borra -sacar
+> un dia lo devuelve a "cerrado"- y que una ficha vacia deja el prompt byte por
+> byte como estaba.
+>
+> Lo que sigue abajo queda como el registro de por que quedo asi.
+
 ## El problema
 
 Los horarios, la direccion, los envios y los medios de pago viven hoy en el
