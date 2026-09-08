@@ -1,7 +1,7 @@
 import { ListaDeConversaciones, type FilaDeConversacion } from "@/components/conversaciones";
 import { EnVivo } from "@/components/en-vivo";
 import { InterruptorDeTema } from "@/components/tema";
-import { Bloque, Chip, claseCampoAngosto } from "@/components/ui";
+import { Bloque, claseCampoAngosto } from "@/components/ui";
 import { cuantasEsperan, type ConversacionEnLista } from "@/lib/conversaciones";
 import { duracion } from "@/lib/duracion";
 import { AccesoRevocado, listarMisConversaciones, verMiNegocio } from "@/lib/portal";
@@ -16,7 +16,7 @@ import { Boton, FormularioPortal } from "./ui";
 //
 // ★ ESTA ES LA CARA DEL PRODUCTO. El panel lo ve la agencia; esto lo ve quien
 // paga. Por eso vive en la piel `papel` -clara, con aire, con tipografia de
-// titulos propia- y no en la del panel, que es una cabina de mando denser
+// titulos propia- y no en la del panel, que es una cabina de mando mas densa,
 // pensada para mirar ocho horas (ver globals.css).
 export const metadata = {
   title: "Mi negocio",
