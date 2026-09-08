@@ -1,5 +1,7 @@
 import "server-only";
 
+import type { Ficha } from "@/lib/ficha";
+
 // Unico lugar por donde el panel habla con la API.
 //
 // ★ ADMIN_API_KEY no lleva el prefijo NEXT_PUBLIC_ a proposito: con el, Next la
@@ -102,6 +104,21 @@ export const guardarLimite = (id: string, monthly_message_limit: number | null) 
     method: "PATCH",
     headers: json,
     body: JSON.stringify({ monthly_message_limit }),
+  });
+
+/**
+ * La ficha de datos del negocio. Es LA MISMA que edita el duenio desde su
+ * portal (ver lib/portal.ts): un solo dato con dos puertas, para que corregir
+ * un horario no dependa de quien lo haga.
+ */
+export const verFicha = (id: string) => pedir<Ficha>(`/tenants/${id}/ficha`);
+
+/** PUT y no PATCH: reemplaza la ficha entera, que es lo que permite BORRAR. */
+export const guardarFicha = (id: string, ficha: Ficha) =>
+  pedir<Ficha>(`/tenants/${id}/ficha`, {
+    method: "PUT",
+    headers: json,
+    body: JSON.stringify(ficha),
   });
 
 export const listarDocumentos = (id: string) => pedir<Documento[]>(`/tenants/${id}/documents`);
