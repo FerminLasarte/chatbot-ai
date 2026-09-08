@@ -19,7 +19,7 @@ export default async function Accesos({ params }: { params: Promise<{ id: string
     <>
       <Bloque
         titulo="Acceso del cliente"
-        ayuda="Un link para que el dueño del negocio vea sus conversaciones y pause el bot él mismo. No ve nada más: ni documentos, ni credenciales, ni consumo, ni otros clientes."
+        ayuda="Un link para que el dueño vea sus conversaciones, conteste él mismo y mantenga al día los datos de su negocio. No ve nada más: ni el comportamiento del bot, ni documentos, ni credenciales, ni consumo, ni otros clientes."
         acciones={tienePortal ? <Chip tono="ok">Con acceso</Chip> : null}
       >
         <p className="mb-3 text-sm text-texto-suave">

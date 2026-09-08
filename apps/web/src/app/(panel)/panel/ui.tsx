@@ -93,7 +93,8 @@ export function FormularioClave({
  * Genera un link para mandarle al cliente y lo deja listo para copiar y pegar.
  *
  * Lo usan los dos links que existen: el de onboarding (conectar WhatsApp) y el
- * del portal (ver conversaciones y pausar el bot). Comparten componente porque
+ * del portal (ver conversaciones, contestar y editar la ficha del negocio).
+ * Comparten componente porque
  * comparten el problema: el secreto se muestra UNA sola vez, asi que la pagina
  * tiene que dejarlo copiar bien antes de que el usuario navegue a otro lado.
  *
