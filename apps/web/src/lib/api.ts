@@ -201,6 +201,13 @@ export type Conversacion = {
   minutos_restantes: number | null;
   mensajes: number;
   ultimo_mensaje: string | null;
+  /** ★ La ventana de atencion al cliente de Meta: fuera de las 24 h desde el
+   *  ultimo mensaje DEL CLIENTE no se puede mandar texto libre. La calcula la
+   *  API porque el navegador no tiene con que: sin esto, quien contesta escribe
+   *  la respuesta entera y se entera al enviarla, con el error de Meta. */
+  ventana_abierta: boolean;
+  /** Cuanto queda de esa ventana. null = el cliente nunca escribio. */
+  minutos_de_ventana: number | null;
 };
 
 export const listarConversaciones = (id: string) =>
@@ -217,6 +224,50 @@ export const pausarBot = (id: string, conversacionId: string, horas: number) =>
 export const reanudarBot = (id: string, conversacionId: string) =>
   pedir<Conversacion>(`/tenants/${id}/conversations/${conversacionId}/manual`, {
     method: "DELETE",
+  });
+
+/**
+ * Como viene cada cliente, para la pantalla principal del panel.
+ *
+ * ★ Es una sola llamada a proposito. La alternativa era pedir por cada cliente
+ * sus conversaciones, su consumo y su WhatsApp: con veinte clientes son ochenta
+ * viajes HTTP en serie -el panel se renderiza en el servidor- cada vez que
+ * alguien abre la pantalla. La API los agrupa del lado de Postgres.
+ */
+export type ResumenCliente = {
+  id: string;
+  slug: string;
+  name: string;
+  is_active: boolean;
+  /** Conversaciones donde alguien pidio una persona y nadie la atendio. */
+  esperando: number;
+  /** Hace cuanto espera la mas vieja. Ya resuelto por la API. */
+  minutos_de_la_mas_vieja: number | null;
+  incidentes: number;
+  conversaciones_activas: number;
+  conversaciones: number;
+  minutos_ultima_actividad: number | null;
+  mensajes_del_mes: number;
+  limite_mensual: number | null;
+  whatsapp_configurado: boolean;
+  tiene_portal: boolean;
+};
+
+/** Los clientes con el que necesita atencion primero. El orden lo da la API. */
+export const listarResumen = () => pedir<ResumenCliente[]>("/tenants/resumen");
+
+/**
+ * Le contesta al cliente final en nombre del negocio.
+ *
+ * Ademas de enviar, la API pausa el bot y da por atendida la derivacion: ver
+ * `services/responder.py`. Devuelve el mensaje ya guardado, para poder pintarlo
+ * en el hilo sin volver a pedirlo todo.
+ */
+export const responderConversacion = (id: string, conversacionId: string, texto: string) =>
+  pedir<Mensaje>(`/tenants/${id}/conversations/${conversacionId}/messages`, {
+    method: "POST",
+    headers: json,
+    body: JSON.stringify({ texto }),
   });
 
 export type Incidente = {

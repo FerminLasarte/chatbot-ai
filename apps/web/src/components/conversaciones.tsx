@@ -1,6 +1,17 @@
-import { Chip, Vacio } from "@/components/ui";
-import { VerConversacion, type MensajeDelHilo } from "@/components/hilo";
+"use client";
+
+import { useMemo, useState } from "react";
+
+import { IconoBuscar } from "@/components/iconos";
+import { VerConversacion, type Responder } from "@/components/hilo";
+import { Chip, Vacio, claseCampo } from "@/components/ui";
+import {
+  comoSeLlama,
+  conLasQueEsperanPrimero,
+  type ConversacionEnLista,
+} from "@/lib/conversaciones";
 import { duracion } from "@/lib/duracion";
+import type { MensajeDelHilo } from "@/components/hilo";
 
 // La lista de conversaciones, compartida por las dos puertas.
 //
@@ -11,79 +22,144 @@ import { duracion } from "@/lib/duracion";
 // nada y garantiza que la proxima mejora se aplique en uno solo. Lo que cambia
 // entre las dos entra por props: de donde salen los mensajes, como se llama a
 // quien contesto a mano, y que acciones van al pie del panel.
+//
+// ★ POR QUE ES UN COMPONENTE DE CLIENTE
+// Filtrar y buscar tienen que responder en la tecla. Los datos los trae el
+// servidor una sola vez; elegir cual de las cuarenta filas se ve es local. Las
+// funciones puras que operan sobre la lista viven en lib/conversaciones.ts,
+// para que las paginas de servidor tambien puedan usarlas.
 
 /** Lo que devuelve la accion que trae un hilo. */
 export type TraerHilo = (
   conversacionId: string,
 ) => Promise<{ mensajes?: MensajeDelHilo[]; error?: string }>;
 
-/** Lo minimo que esta lista necesita saber de una conversacion.
+/** Una fila de la lista, con lo que se puede hacer con ella ya dibujado.
  *
- *  Deliberadamente estructural: tanto `Conversacion` (lib/api.ts, la agencia)
- *  como `ConversacionDelPortal` (lib/portal.ts, el cliente) lo cumplen sin
- *  tener que importarse entre si. */
-export type ConversacionEnLista = {
-  id: string;
-  channel: string;
-  external_id: string;
-  en_modo_manual: boolean;
-  minutos_inactiva: number;
-  minutos_restantes: number | null;
-  derivada: boolean;
-  minutos_desde_derivacion: number | null;
-  mensajes: number;
-  ultimo_mensaje: string | null;
+ *  ★ `acciones` es un nodo YA RENDERIZADO y no una funcion. Antes era una
+ *  funcion que ejecutaba el componente de servidor; ahora que la lista corre en
+ *  el navegador, una funcion no cruzaria la frontera (no es serializable). El
+ *  JSX si: la pagina de servidor arma los formularios de pausa con su Server
+ *  Action adentro y los manda dibujados. */
+export type FilaDeConversacion = {
+  conversacion: ConversacionEnLista;
+  acciones?: React.ReactNode;
 };
 
-/** Cuantas estan esperando que alguien las atienda. */
-export function cuantasEsperan(conversaciones: readonly ConversacionEnLista[]): number {
-  return conversaciones.filter((c) => c.derivada).length;
-}
+type Filtro = "todas" | "esperando" | "a-mano";
 
-/** Las que piden una persona, primero.
- *
- *  ★ El resto conserva el orden que manda la API (la ultima actividad primero).
- *  Enterrado entre veinte conversaciones ordenadas por fecha, un pedido de
- *  ayuda no sirve de nada. */
-export function conLasQueEsperanPrimero<T extends ConversacionEnLista>(
-  conversaciones: readonly T[],
-): T[] {
-  return [...conversaciones].sort((a, b) => Number(b.derivada) - Number(a.derivada));
-}
+const FILTROS: { valor: Filtro; etiqueta: string }[] = [
+  { valor: "todas", etiqueta: "Todas" },
+  { valor: "esperando", etiqueta: "Esperando" },
+  { valor: "a-mano", etiqueta: "Las atendés vos" },
+];
 
 export function ListaDeConversaciones({
-  conversaciones,
+  filas,
   etiquetaPersona,
   traer,
-  acciones,
+  responder,
   vacio,
 }: {
-  conversaciones: readonly ConversacionEnLista[];
+  filas: readonly FilaDeConversacion[];
   /** Como llamar a quien contesto a mano desde el celular. */
   etiquetaPersona: string;
   /** Trae el hilo de una conversacion. Cada lado pasa la suya, con su credencial. */
   traer: TraerHilo;
-  /** Las acciones al pie del panel de cada conversacion (pausar, reanudar).
-   *  Es una funcion y no un nodo porque dependen de cada fila; la ejecuta este
-   *  componente, que corre en el servidor, asi que no cruza ninguna frontera. */
-  acciones?: (conversacion: ConversacionEnLista) => React.ReactNode;
+  /** Manda una respuesta. Sin esto los hilos son de solo lectura. */
+  responder?: Responder;
   /** Que decir cuando no hay ninguna. */
-  vacio: string;
+  vacio: { titulo: string; detalle?: string };
 }) {
-  if (conversaciones.length === 0) return <Vacio titulo={vacio} />;
+  const [busqueda, setBusqueda] = useState("");
+  const [filtro, setFiltro] = useState<Filtro>("todas");
+
+  const cuantas = (f: Filtro) =>
+    f === "esperando"
+      ? filas.filter((f2) => f2.conversacion.derivada).length
+      : f === "a-mano"
+        ? filas.filter((f2) => f2.conversacion.en_modo_manual).length
+        : filas.length;
+
+  const visibles = useMemo(() => {
+    // Se busca por numero y por el ultimo mensaje: uno llega acordandose del
+    // numero o de que se venia hablando, casi nunca de las dos cosas.
+    const q = busqueda.trim().toLowerCase();
+    const filtradas = filas.filter(({ conversacion: c }) => {
+      if (q && !`${c.external_id} ${c.ultimo_mensaje ?? ""}`.toLowerCase().includes(q)) {
+        return false;
+      }
+      if (filtro === "esperando") return c.derivada;
+      if (filtro === "a-mano") return c.en_modo_manual;
+      return true;
+    });
+
+    const orden = conLasQueEsperanPrimero(filtradas.map((f) => f.conversacion));
+    const porId = new Map(filtradas.map((f) => [f.conversacion.id, f]));
+    return orden.map((c) => porId.get(c.id)!);
+  }, [filas, busqueda, filtro]);
+
+  if (filas.length === 0) {
+    return <Vacio titulo={vacio.titulo}>{vacio.detalle}</Vacio>;
+  }
 
   return (
-    <ul className="-my-1 flex flex-col divide-y divide-borde">
-      {conLasQueEsperanPrimero(conversaciones).map((c) => (
-        <Fila
-          key={c.id}
-          conversacion={c}
-          etiquetaPersona={etiquetaPersona}
-          traer={traer}
-          acciones={acciones?.(c)}
-        />
-      ))}
-    </ul>
+    <div className="flex flex-col">
+      <div className="flex flex-wrap items-center gap-2 border-b border-borde px-4 py-2.5">
+        <label className="relative">
+          <span className="sr-only">Buscar en las conversaciones</span>
+          <IconoBuscar className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-texto-tenue" />
+          <input
+            type="search"
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            placeholder="Buscar número o mensaje"
+            className={`${claseCampo} w-56 py-1.5 pl-8 text-xs`}
+          />
+        </label>
+
+        <div className="flex gap-1">
+          {FILTROS.map(({ valor, etiqueta }) => {
+            const activo = filtro === valor;
+            return (
+              <button
+                key={valor}
+                type="button"
+                onClick={() => setFiltro(valor)}
+                aria-pressed={activo}
+                className={`rounded-control px-2.5 py-1.5 text-xs transition-colors ${
+                  activo
+                    ? "bg-superficie-2 font-medium text-texto"
+                    : "text-texto-suave hover:bg-superficie-2 hover:text-texto"
+                }`}
+              >
+                {etiqueta}
+                <span className="tabular ml-1.5 text-texto-tenue">{cuantas(valor)}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {visibles.length === 0 ? (
+        <Vacio titulo="Ninguna conversación coincide">
+          Probá con otro número, o cambiá el filtro.
+        </Vacio>
+      ) : (
+        <ul>
+          {visibles.map(({ conversacion, acciones }) => (
+            <Fila
+              key={conversacion.id}
+              conversacion={conversacion}
+              etiquetaPersona={etiquetaPersona}
+              traer={traer}
+              responder={responder}
+              acciones={acciones}
+            />
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 
@@ -96,15 +172,16 @@ function Fila({
   conversacion,
   etiquetaPersona,
   traer,
+  responder,
   acciones,
 }: {
   conversacion: ConversacionEnLista;
   etiquetaPersona: string;
   traer: TraerHilo;
+  responder?: Responder;
   acciones?: React.ReactNode;
 }) {
-  const esWhatsApp = conversacion.channel === "whatsapp";
-  const quien = esWhatsApp ? `+${conversacion.external_id}` : conversacion.external_id;
+  const quien = comoSeLlama(conversacion);
   const cuantos = `${conversacion.mensajes} ${
     conversacion.mensajes === 1 ? "mensaje" : "mensajes"
   }`;
@@ -112,10 +189,17 @@ function Fila({
   return (
     /* ★ En pantalla ancha la fila se lee como una tabla -quien, en que estado,
        cuando- y no como un parrafo pegado a la izquierda con medio monitor
-       vacio al lado. En angosto vuelve a apilarse. */
-    <li className="-mx-2 flex flex-col gap-2 rounded-lg px-2 py-3 transition-colors hover:bg-superficie-2 lg:flex-row lg:items-center lg:gap-6">
+       vacio al lado. En angosto vuelve a apilarse.
+
+       La franja naranja de la izquierda es el unico adorno, y significa que
+       hay alguien esperando: se ve de un vistazo, sin leer. */
+    <li
+      className={`flex flex-col gap-2 border-t border-borde px-4 py-fila transition-colors first:border-t-0 hover:bg-superficie-2 lg:flex-row lg:items-center lg:gap-4 ${
+        conversacion.derivada ? "shadow-[inset_3px_0_0_var(--alerta)]" : ""
+      }`}
+    >
       <span className="min-w-0 lg:flex-1">
-        <span className="truncate text-sm font-medium text-texto">{quien}</span>
+        <span className="tabular block truncate text-sm font-medium text-texto">{quien}</span>
         {conversacion.ultimo_mensaje && (
           <span className="mt-0.5 block truncate text-sm text-texto-suave">
             {conversacion.ultimo_mensaje}
@@ -123,7 +207,7 @@ function Fila({
         )}
       </span>
 
-      <span className="flex flex-wrap items-center gap-2 lg:shrink-0">
+      <span className="flex flex-wrap items-center gap-1.5 lg:shrink-0">
         {conversacion.derivada && (
           <Chip tono="alerta">
             Pidieron una persona
@@ -134,10 +218,19 @@ function Fila({
         {conversacion.minutos_restantes !== null && (
           <Chip>Lo atendés vos · vuelve en {duracion(conversacion.minutos_restantes)}</Chip>
         )}
+        {/* Solo cuando esta por vencerse: decir "quedan 23 h" en cada fila es
+            ruido, pero enterarse tarde de que quedaban veinte minutos es caro. */}
+        {conversacion.ventana_abierta &&
+          conversacion.minutos_de_ventana !== null &&
+          conversacion.minutos_de_ventana < 120 && (
+            <Chip tono="alerta">
+              Se le puede escribir {duracion(conversacion.minutos_de_ventana)} más
+            </Chip>
+          )}
       </span>
 
-      <span className="flex items-center justify-between gap-3 lg:w-72 lg:shrink-0 lg:justify-end">
-        <span className="text-xs whitespace-nowrap text-texto-tenue">
+      <span className="flex items-center justify-between gap-3 lg:w-64 lg:shrink-0 lg:justify-end">
+        <span className="tabular text-xs whitespace-nowrap text-texto-tenue">
           {cuantos} &middot; hace {duracion(conversacion.minutos_inactiva)}
         </span>
 
@@ -147,6 +240,10 @@ function Fila({
           subtitulo={`${cuantos} · hace ${duracion(conversacion.minutos_inactiva)}`}
           etiquetaPersona={etiquetaPersona}
           traer={traer}
+          responder={responder}
+          ventanaAbierta={conversacion.ventana_abierta}
+          minutosDeVentana={conversacion.minutos_de_ventana}
+          disparador={responder ? "Abrir" : "Ver conversación"}
         >
           {acciones}
         </VerConversacion>

@@ -34,7 +34,7 @@ export function NavDelCliente({ id }: { id: string }) {
             key={href}
             href={destino}
             aria-current={activa ? "page" : undefined}
-            className={`shrink-0 rounded-lg px-3 py-2 text-sm transition-colors ${
+            className={`shrink-0 rounded-control px-3 py-1.5 text-sm transition-colors ${
               activa
                 ? "bg-superficie-2 font-medium text-texto"
                 : "text-texto-suave hover:bg-superficie-2 hover:text-texto"

@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { IconoFlechaIzquierda } from "@/components/iconos";
 import { Chip } from "@/components/ui";
 import { listarClaves, verWhatsApp } from "@/lib/api";
 import { clienteDelPanel, exigirPanel } from "../guardia";
+import { BarraDelPanel } from "../marco";
 import { NavDelCliente } from "./nav";
 
 export const metadata = { title: "Cliente" };
@@ -24,6 +26,11 @@ export const metadata = { title: "Cliente" };
  * que las administra, asi que para saber si el bot podia contestar habia que ir
  * a mirar. Ademas el layout no se vuelve a renderizar al cambiar de seccion:
  * estas dos consultas se hacen una vez por cliente, no una por pantalla.
+ *
+ * ★ POR QUE EL NOMBRE DEL CLIENTE ESTA EN LA BARRA Y NO EN LA COLUMNA
+ * Es la respuesta a "¿en cual de los seis estoy parado?", y esa pregunta
+ * aparece justo cuando alguien vuelve a la pestania despues de un rato. Arriba
+ * de todo se contesta sin mover los ojos.
  */
 export default async function LayoutDelCliente({
   children,
@@ -45,59 +52,43 @@ export default async function LayoutDelCliente({
   const tienePortal = claves.some((k) => k.is_active && k.scopes.includes("client_portal"));
 
   return (
-    <div className="flex flex-1 flex-col lg:flex-row">
-      <aside className="border-borde bg-superficie lg:sticky lg:top-0 lg:h-screen lg:w-60 lg:shrink-0 lg:border-r">
-        <div className="flex flex-col gap-5 px-4 py-5 lg:px-5 lg:py-6">
-          <div>
-            <Link
-              href="/panel"
-              className="text-xs text-texto-tenue transition-colors hover:text-texto"
-            >
-              &larr; Clientes
-            </Link>
-            <h1 className="mt-2 truncate text-lg font-semibold tracking-tight text-texto">
-              {cliente.name}
-            </h1>
-            <p className="truncate text-xs text-texto-tenue">{cliente.slug}</p>
+    <>
+      <BarraDelPanel>
+        <div className="flex min-w-0 items-center gap-2">
+          <Link
+            href="/panel"
+            aria-label="Volver a clientes"
+            className="rounded-control p-1 text-texto-tenue transition-colors hover:bg-superficie-2 hover:text-texto"
+          >
+            <IconoFlechaIzquierda className="size-3.5" />
+          </Link>
+          <span className="truncate text-sm font-medium text-texto">{cliente.name}</span>
+          <span className="tabular hidden font-mono text-[11px] text-texto-tenue sm:inline">
+            {cliente.slug}
+          </span>
+
+          <span className="ml-2 hidden items-center gap-1.5 md:flex">
+            {!wa.configurado && <Chip tono="alerta">WhatsApp sin conectar</Chip>}
+            {!tienePortal && <Chip tono="neutro">Sin acceso del dueño</Chip>}
+            {!cliente.is_active && <Chip tono="alerta">Inactivo</Chip>}
+            {wa.configurado && tienePortal && cliente.is_active && (
+              <Chip tono="ok">Todo conectado</Chip>
+            )}
+          </span>
+        </div>
+      </BarraDelPanel>
+
+      <div className="flex flex-1 flex-col lg:flex-row">
+        <aside className="border-borde bg-superficie lg:sticky lg:top-12 lg:h-[calc(100dvh-3rem)] lg:w-52 lg:shrink-0 lg:border-r">
+          <div className="px-3 py-3 lg:px-3 lg:py-4">
+            <NavDelCliente id={id} />
           </div>
+        </aside>
 
-          <NavDelCliente id={id} />
-        </div>
-      </aside>
-
-      <main className="min-w-0 flex-1 px-4 py-6 lg:px-8 lg:py-8">
-        <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-6">
-          <EstadoDelCliente
-            configurado={wa.configurado}
-            tienePortal={tienePortal}
-            activo={cliente.is_active}
-          />
-          {children}
-        </div>
-      </main>
-    </div>
-  );
-}
-
-/** Lo que hay que saber de este cliente en cualquier seccion. */
-function EstadoDelCliente({
-  configurado,
-  tienePortal,
-  activo,
-}: {
-  configurado: boolean;
-  tienePortal: boolean;
-  activo: boolean;
-}) {
-  return (
-    <div className="flex flex-wrap items-center gap-2">
-      <Chip tono={configurado ? "ok" : "alerta"}>
-        {configurado ? "WhatsApp conectado" : "WhatsApp sin configurar"}
-      </Chip>
-      <Chip tono={tienePortal ? "neutro" : "alerta"}>
-        {tienePortal ? "El dueño tiene acceso" : "El dueño no tiene acceso"}
-      </Chip>
-      {!activo && <Chip tono="alerta">Cliente inactivo</Chip>}
-    </div>
+        <main className="min-w-0 flex-1 px-4 py-6 lg:px-6 lg:py-8">
+          <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-6">{children}</div>
+        </main>
+      </div>
+    </>
   );
 }
