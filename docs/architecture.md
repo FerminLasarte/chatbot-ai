@@ -31,7 +31,8 @@ apps/api/
 │   │   ├── prompts/
 │   │   │   ├── base_system.py  Reglas del motor, iguales para todos. Versionadas.
 │   │   │   ├── rag_answer.py   Como se inyecta el contexto recuperado.
-│   │   │   └── builder.py      Compone base + prompt del tenant + contexto.
+│   │   │   ├── negocio.py      La ficha del negocio, como DATO entre etiquetas.
+│   │   │   └── builder.py      Compone base + prompt del tenant + ficha + contexto.
 │   │   └── rag/
 │   │       ├── ingest.py     Documento -> chunks -> embeddings -> DB.
 │   │       ├── embedder.py   Texto -> vectores (proveedor intercambiable).
@@ -314,7 +315,7 @@ invalida todo lo posterior. Por eso el prompt se arma en este orden:
 | Posicion | Contenido              | Estabilidad        | Cache             |
 | -------- | ---------------------- | ------------------ | ----------------- |
 | 0        | `BASE_SYSTEM_PROMPT`   | identico a todos   | compartido global |
-| 1        | `tenant.system_prompt` | estable por cliente| por tenant ← breakpoint |
+| 1        | `tenant.system_prompt` + la ficha del negocio | estable por cliente| por tenant ← breakpoint |
 | 2        | contexto RAG + pregunta| cambia siempre     | sin cache         |
 
 El `cache_control` va en el bloque 1. El contexto recuperado va en el turno del

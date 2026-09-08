@@ -20,25 +20,46 @@ error, simplemente `cache_creation_input_tokens: 0`).
 from anthropic.types import ContentBlockParam, TextBlockParam
 
 from app.ai.prompts.base_system import BASE_SYSTEM_PROMPT
+from app.ai.prompts.negocio import render_ficha
 from app.ai.prompts.rag_answer import format_context
+from app.schemas.negocio import FichaNegocio
 
 
-def build_system_blocks(tenant_prompt: str) -> list[TextBlockParam]:
-    """Devuelve los bloques `system` listos para la Messages API."""
+def build_system_blocks(
+    tenant_prompt: str, ficha: FichaNegocio | None = None
+) -> list[TextBlockParam]:
+    """Devuelve los bloques `system` listos para la Messages API.
+
+    La ficha del negocio va en el bloque [1], pegada al prompt del cliente y
+    antes del breakpoint: cambia cada varios meses, asi que cachea igual de bien.
+
+    ★ Sin ficha, o con una vacia, el bloque [1] queda EXACTAMENTE como estaba
+    antes de que la ficha existiera. Es lo que evita que estrenar la feature le
+    invalide el cache a los clientes que no la usan.
+    """
     return [
         TextBlockParam(type="text", text=BASE_SYSTEM_PROMPT),
         TextBlockParam(
             type="text",
-            text=_tenant_section(tenant_prompt),
-            # Breakpoint: cachea tools + base + prompt del tenant.
+            text=_tenant_section(tenant_prompt, ficha),
+            # Breakpoint: cachea tools + base + prompt del tenant + su ficha.
             cache_control={"type": "ephemeral"},
         ),
     ]
 
 
-def _tenant_section(tenant_prompt: str) -> str:
+def _tenant_section(tenant_prompt: str, ficha: FichaNegocio | None) -> str:
     body = tenant_prompt.strip() or "(sin instrucciones especificas)"
-    return f"<instrucciones_del_negocio>\n{body}\n</instrucciones_del_negocio>"
+    secciones = [f"<instrucciones_del_negocio>\n{body}\n</instrucciones_del_negocio>"]
+
+    # ★ La ficha va DESPUES de las instrucciones. El orden importa: primero lo
+    # que escribio la agencia -que es quien define como se comporta el bot- y
+    # despues los datos que carga el negocio, que son material de consulta.
+    datos = render_ficha(ficha) if ficha is not None else None
+    if datos:
+        secciones.append(datos)
+
+    return "\n\n".join(secciones)
 
 
 def build_user_turn(question: str, chunks: list[str]) -> list[ContentBlockParam]:
