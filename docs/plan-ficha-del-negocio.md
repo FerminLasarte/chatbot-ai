@@ -220,6 +220,34 @@ encabezado de `routes/portal.py`.
 - Una clave de portal sigue recibiendo 403 en el prompt, los documentos, el
   consumo y las claves (esto ya esta; que no se afloje al ampliar el scope).
 
+### Lo que un rediseno de la UI tiene que contemplar
+
+★ Los pasos 5 a 7 son pantallas, asi que van DESPUES de cualquier rediseno en
+curso: hacerlos antes es escribir un formulario para tirarlo. Pero el rediseno
+necesita saber que vienen, o va a quedar sin las piezas.
+
+Lo que la ficha va a pedirle al sistema visual, y hoy no existe en ningun lado
+del producto:
+
+- **El portal pasa de UNA pantalla a DOS.** `/mi-negocio` es hoy una pagina
+  suelta sin navegacion. Con la ficha son Conversaciones y Mi negocio: hace
+  falta una navegacion de dos items, y lo natural es que sea la misma pieza que
+  usa el panel (`panel/[id]/nav.tsx`), extraida a `components/`.
+- **El panel suma una seccion**, "Negocio": el nav pasa de cinco items a seis.
+- **Una fila repetible**, con agregar y quitar. La usan los tramos de horario y
+  los bloques extra. Si no existe en el sistema, cada pantalla que la necesite
+  se la va a inventar distinta.
+- **Un campo de hora** (`<input type="time">`). No hay ninguno todavia, y el
+  navegador le pone su propia apariencia: hay que decidirla una vez.
+- **Una grilla de siete dias que entre en un celular.** El duenio de la PyME va
+  a editar sus horarios desde el telefono, no desde una notebook.
+- **Un formulario largo con estado sucio.** Los que hay son cortos y les alcanza
+  el `Aviso` al pie; en una ficha de siete campos mas horarios hace falta ver si
+  hay cambios sin guardar.
+- **Un estado vacio que invite a completar.** Un cliente recien dado de alta
+  abre la ficha y esta toda en blanco: tiene que parecer un formulario por
+  llenar, no una pantalla rota.
+
 ### Paso 5 — El componente compartido
 
 **Archivo nuevo:** `apps/web/src/components/ficha-del-negocio.tsx` (`"use client"`)
