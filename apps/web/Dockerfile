@@ -16,11 +16,11 @@ RUN npm ci
 
 COPY . .
 
-# Se incrustan en el bundle durante el build (ver nota de arriba).
-ARG NEXT_PUBLIC_API_URL
-ARG NEXT_PUBLIC_API_KEY
-ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL \
-    NEXT_PUBLIC_API_KEY=$NEXT_PUBLIC_API_KEY
+# ★ NO hay ARG NEXT_PUBLIC_*. Las unicas dos que existian las usaba la pantalla
+# de prueba (/probar), que ya no se despliega. Una `NEXT_PUBLIC_` se incrusta en
+# el JavaScript que descarga cualquiera, y la que habia aca pedia una clave con
+# scope `tenant`: la que puede subir documentos. Que no se pueda pasar al build
+# es lo que evita publicarla por accidente.
 
 RUN npm run build
 

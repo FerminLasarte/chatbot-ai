@@ -1,198 +1,90 @@
-"use client";
+import Link from "next/link";
 
 import { InterruptorDeTema } from "@/components/tema";
-import { claseBoton, claseCampo } from "@/components/ui";
+import { EMPRESA } from "@/lib/empresa";
 
-import { FormEvent, useRef, useState } from "react";
+export const metadata = {
+  title: "Argencore · Asistente de WhatsApp para comercios",
+  description:
+    "Un asistente que contesta las consultas de tus clientes por WhatsApp, con la información de tu negocio.",
+};
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
-const API_KEY = process.env.NEXT_PUBLIC_API_KEY ?? "";
+// La raiz del dominio.
+//
+// ★ QUE HABIA ACA ANTES
+// El chat de prueba del motor, con una zona para arrastrar un PDF y un cartel
+// que decia "Falta NEXT_PUBLIC_API_KEY... corre este comando". Era una
+// herramienta de desarrollo que quedo ocupando la puerta de entrada: cualquiera
+// que abriera el dominio -un cliente al que le pasas el link- veia un chat de
+// laboratorio y un error de programador. Ahora vive en /probar y solo en
+// desarrollo.
+//
+// ★ POR QUE ESTA PAGINA ES CORTA A PROPOSITO
+// No es una landing de venta: eso se escribe cuando haya algo que vender por
+// autoservicio. Hoy el producto se vende hablando, y esta URL cumple tres
+// funciones concretas: decir de quien es el sitio, dejar entrar al equipo, y
+// tener las tres paginas legales a un click -que es lo que Meta revisa desde
+// afuera, y hasta ahora solo se linkeaban desde el alta-.
 
-// El backend responde JSON, pero un 500 sin manejar de FastAPI viene en texto
-// plano: hacer res.json() a ciegas rompe ahi y el error real queda tapado por
-// un "no se pudo conectar" que miente sobre lo que paso.
-async function leerError(res: Response): Promise<string> {
-  try {
-    const data = await res.json();
-    return data.detail ?? `error ${res.status}`;
-  } catch {
-    return `error ${res.status} del servidor`;
-  }
-}
-
-type Mensaje = { rol: "user" | "assistant"; texto: string };
-
-type EstadoDocumento =
-  | { tipo: "vacio" }
-  | { tipo: "subiendo"; nombre: string }
-  | { tipo: "listo"; nombre: string; chunks: number }
-  | { tipo: "error"; mensaje: string };
-
-export default function Home() {
-  const [documento, setDocumento] = useState<EstadoDocumento>({ tipo: "vacio" });
-  const [mensajes, setMensajes] = useState<Mensaje[]>([]);
-  const [pregunta, setPregunta] = useState("");
-  const [enviando, setEnviando] = useState(false);
-  const conversationId = useRef<string | null>(null);
-
-  const sinClave = !API_KEY;
-
-  async function subirArchivo(file: File) {
-    setDocumento({ tipo: "subiendo", nombre: file.name });
-    const form = new FormData();
-    form.append("file", file);
-
-    try {
-      const res = await fetch(`${API_URL}/api/v1/knowledge/documents`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${API_KEY}` },
-        body: form,
-      });
-      if (!res.ok) {
-        setDocumento({ tipo: "error", mensaje: await leerError(res) });
-        return;
-      }
-      const data = await res.json();
-      setDocumento({ tipo: "listo", nombre: data.title, chunks: data.chunks });
-      setMensajes([]);
-      conversationId.current = null;
-    } catch {
-      setDocumento({ tipo: "error", mensaje: "no se pudo conectar con el servidor" });
-    }
-  }
-
-  async function enviarPregunta(e: FormEvent) {
-    e.preventDefault();
-    const texto = pregunta.trim();
-    if (!texto || enviando) return;
-
-    setMensajes((m) => [...m, { rol: "user", texto }]);
-    setPregunta("");
-    setEnviando(true);
-
-    try {
-      const res = await fetch(`${API_URL}/api/v1/chat`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          message: texto,
-          conversation_id: conversationId.current,
-        }),
-      });
-      if (!res.ok) {
-        const error = await leerError(res);
-        setMensajes((m) => [...m, { rol: "assistant", texto: error }]);
-        return;
-      }
-      const data = await res.json();
-      conversationId.current = data.conversation_id;
-      setMensajes((m) => [...m, { rol: "assistant", texto: data.reply }]);
-    } catch {
-      setMensajes((m) => [
-        ...m,
-        { rol: "assistant", texto: "No se pudo conectar con el servidor." },
-      ]);
-    } finally {
-      setEnviando(false);
-    }
-  }
-
+export default function Portada() {
   return (
-    <div className="flex flex-1 flex-col items-center px-4 py-10">
-      <div className="flex w-full max-w-2xl flex-col gap-6">
-        {/* ★ Esta es la URL raiz del producto y decia "Chatbot AI — demo", que
-            no es como se llama nada. Es la pantalla que se abre para mostrarle
-            el asistente a un cliente nuevo, asi que lleva el nombre real. */}
-        <header className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h1 className="font-titulo text-2xl font-semibold tracking-tight text-texto">
-              Probá el asistente
-            </h1>
-            <p className="mt-1 text-sm text-texto-suave">
-              Sub&iacute; un documento y pregunt&aacute;le lo que quieras. Es el mismo motor
-              que despu&eacute;s contesta por WhatsApp.
-            </p>
-          </div>
+    <div className="flex flex-1 flex-col px-4 py-10 sm:py-16">
+      <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-10">
+        <header className="flex items-start justify-between gap-4">
+          <p className="font-titulo text-sm font-semibold tracking-tight text-texto">
+            {EMPRESA.nombreComercial}
+          </p>
           <InterruptorDeTema />
         </header>
 
-        {sinClave && (
-          <div className="rounded-panel bg-alerta-suave p-4 text-sm text-alerta">
-            Falta <code>NEXT_PUBLIC_API_KEY</code> en <code>apps/web/.env.local</code>. Corr&eacute;:
-            <pre className="mt-2 overflow-x-auto rounded bg-superficie-2 p-2">
-              cd apps/api &amp;&amp; uv run python -m app.cli crear-tenant-demo
-            </pre>
-            y reinici&aacute; el servidor de Next.js.
-          </div>
-        )}
-
-        <section className="rounded-panel border border-borde bg-superficie p-5 shadow-panel">
-          <label className="flex cursor-pointer flex-col items-center gap-2 rounded-control border-2 border-dashed border-borde-fuerte p-6 text-center transition-colors hover:border-acento">
-            <span className="text-sm text-texto-suave">
-              {documento.tipo === "vacio" && "Hacé click para elegir un PDF, .txt o .md"}
-              {documento.tipo === "subiendo" && `Subiendo ${documento.nombre}...`}
-              {documento.tipo === "listo" &&
-                `${documento.nombre} — ${documento.chunks} fragmentos indexados`}
-              {documento.tipo === "error" && documento.mensaje}
-            </span>
-            <input
-              type="file"
-              accept=".pdf,.txt,.md"
-              className="hidden"
-              disabled={sinClave || documento.tipo === "subiendo"}
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) void subirArchivo(file);
-              }}
-            />
-          </label>
-        </section>
-
-        <section className="flex min-h-96 flex-col rounded-xl border border-borde bg-superficie">
-          <div className="flex flex-1 flex-col gap-3 overflow-y-auto p-4">
-            {mensajes.length === 0 && (
-              <p className="m-auto text-sm text-texto-tenue">
-                Sin mensajes todav&iacute;a. Escrib&iacute; algo abajo.
-              </p>
-            )}
-            {mensajes.map((m, i) => (
-              <div
-                key={i}
-                className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${
-                  m.rol === "user"
-                    ? "self-end bg-acento-suave text-texto"
-                    : "self-start bg-superficie-2 text-texto"
-                }`}
-              >
-                {m.texto}
-              </div>
-            ))}
-            {enviando && <p className="self-start text-sm text-texto-tenue">escribiendo...</p>}
+        <main className="flex flex-1 flex-col justify-center gap-6 py-6">
+          <div>
+            <h1 className="font-titulo text-3xl font-semibold tracking-tight text-balance text-texto sm:text-4xl">
+              Un asistente que atiende tu WhatsApp
+            </h1>
+            <p className="mt-3 max-w-prose text-base text-texto-suave">
+              Contesta las consultas de tus clientes con la informaci&oacute;n de tu negocio
+              &mdash;horarios, precios, env&iacute;os&mdash; y te avisa cuando alguien
+              necesita hablar con una persona. Vos segu&iacute;s contestando desde el mismo
+              WhatsApp de siempre cuando quer&eacute;s.
+            </p>
           </div>
 
-          <form
-            onSubmit={enviarPregunta}
-            className="flex gap-2 border-t border-borde p-3"
-          >
-            <input
-              value={pregunta}
-              onChange={(e) => setPregunta(e.target.value)}
-              placeholder="Escribí tu pregunta..."
-              disabled={sinClave}
-              className={claseCampo}
-            />
-            <button
-              type="submit"
-              disabled={sinClave || enviando || !pregunta.trim()}
-              className={claseBoton()}
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+            <a
+              href={`mailto:${EMPRESA.email}`}
+              className="font-medium text-acento hover:underline"
             >
-              Enviar
-            </button>
-          </form>
-        </section>
+              Escribinos
+            </a>
+            <span className="text-texto-tenue">&middot;</span>
+            {/* Discreto y sin promesas: quien lo necesita ya sabe que existe, y
+                a quien no, no le dice nada. */}
+            <Link href="/panel" className="text-texto-suave hover:text-texto hover:underline">
+              Panel del equipo
+            </Link>
+          </div>
+        </main>
+
+        <footer className="border-t border-borde pt-6 text-xs text-texto-suave">
+          <nav className="flex flex-wrap gap-x-4 gap-y-1">
+            <Link href="/privacidad" className="hover:underline">
+              Pol&iacute;tica de privacidad
+            </Link>
+            <Link href="/terminos" className="hover:underline">
+              T&eacute;rminos del servicio
+            </Link>
+            <Link href="/eliminar-datos" className="hover:underline">
+              Eliminaci&oacute;n de datos
+            </Link>
+          </nav>
+          <p className="mt-3">
+            {EMPRESA.razonSocial} &middot;{" "}
+            <a href={`mailto:${EMPRESA.email}`} className="hover:underline">
+              {EMPRESA.email}
+            </a>
+          </p>
+        </footer>
       </div>
     </div>
   );

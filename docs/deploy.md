@@ -86,26 +86,39 @@ Otro servicio desde el mismo repo. En Settings:
 
 | Variable | Valor | Llega al navegador? |
 | --- | --- | --- |
-| `NEXT_PUBLIC_API_URL` | `https://TU-API.up.railway.app` | si |
-| `NEXT_PUBLIC_API_KEY` | clave del tenant de demo (ver aviso) | **si** |
 | `API_URL` | `https://TU-API.up.railway.app` | no |
 | `ADMIN_API_KEY` | tu clave admin | no |
 | `PANEL_PASSWORD` | la contrasena para entrar a `/panel` | no |
 | `PANEL_SECRET` | `openssl rand -hex 32` | no |
 
-Las cuatro de abajo **no** llevan `NEXT_PUBLIC_` a proposito: se leen solo en el
-servidor. Es lo que permite que el panel use una clave admin sin exponerla.
+Ninguna lleva `NEXT_PUBLIC_` a proposito: se leen solo en el servidor y no
+llegan al navegador. Es lo que permite que el panel use una clave admin sin
+exponerla.
 
-> **Las dos `NEXT_PUBLIC_*` se incrustan en el build, no se leen en runtime.**
-> Consecuencia practica: **si las cambias, hay que redesplegar el servicio
-> Web**, no alcanza con reiniciarlo. Las otras cuatro si se leen en runtime.
+> **No cargues ninguna variable `NEXT_PUBLIC_*` en este servicio.** Las dos que
+> existieron (`NEXT_PUBLIC_API_URL` y `NEXT_PUBLIC_API_KEY`) las usaba la
+> pantalla de prueba, que ya no se despliega; el `Dockerfile` ni siquiera las
+> acepta como build arg. Una `NEXT_PUBLIC_` se incrusta en el JavaScript que
+> descarga cualquiera: es publica por definicion.
 
-> **AVISO SOBRE LA PAGINA DE DEMO (`/`).** `NEXT_PUBLIC_API_KEY` queda dentro
-> del JavaScript que descarga cualquiera que abra la pagina — es publica por
-> definicion. Esa pagina usa una clave con scope `tenant`, que **puede subir
-> documentos**. Con un tenant de demo el riesgo es acotado; **no la apuntes al
-> tenant de un cliente real**. Para clientes reales, emiti desde el panel una
-> clave con scope `chat`, que solo puede conversar.
+### La pantalla de prueba (`/probar`) no se despliega
+
+Es el chat con el que se prueba el motor -subir un documento y preguntarle-.
+Vivio mucho tiempo en `/`, la raiz del dominio: cualquiera que abriera el sitio
+veia un chat de laboratorio y un cartel con comandos de terminal. Hoy vive en
+`/probar` y el portero es `NODE_ENV`, asi que existe con `npm run dev` y
+devuelve 404 en la imagen desplegada.
+
+**Si algun dia se quiere publicar**, sacar el portero NO alcanza. La pantalla
+autentica con `NEXT_PUBLIC_API_KEY`, y el flujo actual pide una clave con scope
+`tenant`, que **puede subir documentos**. Antes de publicarla hay que:
+
+1. Emitir desde el panel una clave con scope **`chat`** —que solo conversa— para
+   un tenant de demo, nunca para el de un cliente real.
+2. Adaptar la pantalla: con scope `chat` no se puede subir el documento, asi que
+   la base de conocimiento del tenant de demo hay que cargarla desde el panel.
+3. Devolverle los `ARG` al `Dockerfile` y recordar que se incrustan en el build:
+   **si se cambian, hay que redesplegar**, no alcanza con reiniciar.
 
 ### Panel de administracion
 
