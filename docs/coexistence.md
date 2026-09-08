@@ -164,6 +164,11 @@ Ajustes -> Herramientas para la empresa -> Mensaje de bienvenida y Mensaje de
 ausencia. No hay forma de distinguirlos en el payload: para Meta son iguales a
 un mensaje escrito a mano.
 
+Y ya que se esta: **verificar la atribucion en ese cliente**. Contestar un
+mensaje a mano desde el celular y confirmar en el panel que aparece como "A
+mano" y no como "Asistente". Son dos minutos y es la unica forma de saber que el
+puente quedo armado de verdad para ese numero.
+
 ## Como quedo (verificado en produccion el 2026-08-31)
 
 **El payload es el que asumia el parser.** El echo real se paso por `parse_echo`
@@ -188,6 +193,25 @@ cada mensaje del cliente. Cada respuesta manual corre el vencimiento.
 `Register endpoint is not available for SMB businesses`: un numero que viene de
 la app ya quedo registrado por ese vinculo. El alta lo reconoce y no lo reporta
 como advertencia (ver `_es_alta_de_coexistence` en `services/whatsapp.py`).
+
+**La atribucion es correcta de punta a punta (verificado el 2026-09-07).** Era lo
+ultimo que faltaba ver con datos reales: entre el celular y la etiqueta en
+pantalla estan el echo, `registrar_saliente` y el render, y ningun test cubre que
+Meta mande el echo en produccion. En el hilo `5491125011622` de Argencore, leido
+por la API, quedaron los tres casos mezclados en el orden que corresponde:
+
+```
+user      autor=None      mensaje del cliente final
+assistant autor=bot       la respuesta del asistente
+assistant autor=persona   lo que se contesto desde el celular (x4)
+```
+
+Y en el panel se pinta igual: la respuesta del bot dice **"Asistente"**, las
+manuales dicen **"A mano"**, y los mensajes del cliente final van sin etiqueta.
+En el portal del duenio, esas mismas dicen **"Vos"**.
+
+Los `user autor=None` **no** son mensajes viejos sin atribuir: el autor solo
+aplica a los mensajes del negocio, y el cliente final nunca lleva etiqueta.
 
 **Para apagarlo**, `COEXISTENCE_ENABLED=false` en Railway: el bot vuelve a
 ignorar los echoes al toque y nada mas cambia.
