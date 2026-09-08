@@ -39,7 +39,10 @@ export default async function Conocimiento({ params }: { params: Promise<{ id: s
         ayuda="De acá saca la información para responder. Si actualizás un tarifario, borrá el viejo o va a mezclar datos."
       >
         {documentos.length === 0 ? (
-          <Vacio>Sin documentos todavía.</Vacio>
+          <Vacio titulo="Sin documentos todavía">
+            Subí un tarifario o un instructivo y el asistente empieza a responder con esa
+            información.
+          </Vacio>
         ) : (
           <ul className="-mt-1 flex flex-col divide-y divide-borde">
             {documentos.map((d) => (

@@ -70,7 +70,7 @@ export function ListaDeConversaciones({
   /** Que decir cuando no hay ninguna. */
   vacio: string;
 }) {
-  if (conversaciones.length === 0) return <Vacio>{vacio}</Vacio>;
+  if (conversaciones.length === 0) return <Vacio titulo={vacio} />;
 
   return (
     <ul className="-my-1 flex flex-col divide-y divide-borde">

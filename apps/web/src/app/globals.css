@@ -1,73 +1,142 @@
 @import "tailwindcss";
 
-/* Sistema visual del producto.
+/* ===========================================================================
+ * EL SISTEMA VISUAL DEL PRODUCTO
  *
  * ★ POR QUE TOKENS Y NO `zinc-800` SUELTO EN CADA PANTALLA
  * Las paginas venian escribiendo el color a mano, y el resultado fue que el
  * mismo boton terminara con dos grises distintos segun quien lo hubiera
  * copiado. Un token le pone nombre a la INTENCION -esto es una superficie,
- * esto es texto secundario, esto pide una accion- y el modo oscuro se resuelve
- * una vez, aca, en vez de con un `dark:` pegado a cada clase.
+ * esto es texto secundario, esto pide una accion-, no al color.
  *
- * La paleta es neutra con un solo acento: mucho blanco, grises calidos, y azul
- * unicamente en lo que se puede tocar. Es lo que hace que en una pantalla densa
- * el ojo encuentre solo la accion.
- */
+ * ★ POR QUE HAY DOS PIELES Y NO UNA
+ * El panel de la agencia y las pantallas que abre el cliente final son dos
+ * herramientas para dos personas distintas, y el cliente NUNCA ve el panel:
+ * no hay ninguna coherencia de marca que proteger entre ellos.
+ *
+ *   `consola`  el panel. Denso, frio, filas cortas, numeros en monoespaciada.
+ *              Es una cabina de mando que alguien tiene abierta ocho horas.
+ *   `papel`    el portal del cliente, el alta y todo lo publico. Calmo, claro,
+ *              con aire. Lo abre alguien desde el celular una vez por semana.
+ *
+ * ★ LO QUE HACE QUE ESTO NO SE DEGRADE
+ * Cambian los VALORES, nunca los NOMBRES. `--acento` significa "esto se puede
+ * tocar" en las dos pieles; solo difiere en que color es. Por eso un mismo
+ * componente se dibuja en las dos sin un solo `if`, y por eso agregar una
+ * tercera piel algun dia es un bloque de variables y no otra libreria.
+ *
+ * ★ POR QUE `light-dark()` Y NO UN @media POR CADA PIEL
+ * Con dos pieles y tres estados de tema (sistema, claro forzado, oscuro
+ * forzado) la version con media queries son SEIS bloques de valores que hay
+ * que mantener sincronizados a mano. `light-dark()` los reduce a uno por piel:
+ * cada token declara sus dos valores en la misma linea, y quien elige cual se
+ * usa es `color-scheme`, que ademas le arregla de paso el color a los
+ * scrollbars y a los controles nativos del navegador.
+ * ======================================================================== */
 
+/* Sin `data-tema`, el sistema decide. Con el, decide el usuario. Es lo unico
+ * que necesita el interruptor manual: no reescribe ningun token. */
 :root {
+  color-scheme: light dark;
+}
+:root[data-tema="claro"] {
+  color-scheme: light;
+}
+:root[data-tema="oscuro"] {
+  color-scheme: dark;
+}
+
+/* ---------------------------------------------------------------------------
+ * PAPEL — el portal del cliente, el alta y lo publico.
+ *
+ * Papel hueso y un solo verde tinta. El acento sale del mundo donde vive el
+ * producto -WhatsApp- bajado a algo que se pueda mirar todo el dia sin gritar.
+ * ------------------------------------------------------------------------ */
+[data-piel="papel"] {
   /* Superficies, de atras hacia adelante. */
-  --fondo: #fbfbfa;
-  --superficie: #ffffff;
-  --superficie-2: #f4f4f2;
-  --borde: #e7e5e2;
-  --borde-fuerte: #d6d3ce;
+  --fondo: light-dark(#fbfaf7, #161614);
+  --superficie: light-dark(#ffffff, #1e1e1b);
+  --superficie-2: light-dark(#f3f1ec, #262622);
+  --borde: light-dark(#e7e3da, #34332d);
+  --borde-fuerte: light-dark(#d2ccc0, #47453a);
 
-  /* Texto. `suave` es para lo que acompania: fechas, contadores, ayudas. */
-  --texto: #1c1917;
-  --texto-suave: #78716c;
-  --texto-tenue: #a8a29e;
+  /* Texto. `suave` es lo que acompania: fechas, contadores, ayudas. */
+  --texto: light-dark(#1a1a17, #edebe5);
+  --texto-suave: light-dark(#6c6860, #a49f94);
+  --texto-tenue: light-dark(#a19c90, #79756b);
 
-  /* El acento. Un azul sobrio, tomado del logo. Cambiar estas tres lineas
-   * recolorea todo lo accionable del producto. */
-  --acento: #2563eb;
-  --acento-fuerte: #1d4ed8;
-  --acento-suave: #eff5ff;
+  /* El acento: SOLO lo que se puede tocar. */
+  --acento: light-dark(#1f5f46, #6fbf95);
+  --acento-fuerte: light-dark(#164a36, #8fd3ae);
+  --acento-suave: light-dark(#eaf2ed, #17281f);
+  /* El texto que va ENCIMA del acento. En oscuro el acento se aclara, asi que
+   * un blanco fijo dejaria un boton verde claro con letras blancas. */
+  --sobre-acento: light-dark(#ffffff, #0e1a14);
 
-  /* Estados. `alerta` es "esto pide que alguien haga algo" -una derivacion
-   * esperando-, distinto de `error`, que es "algo salio mal". */
-  --alerta: #a16207;
-  --alerta-suave: #fefce8;
-  --error: #b91c1c;
-  --error-suave: #fef2f2;
-  --ok: #15803d;
-  --ok-suave: #f0fdf4;
+  /* Estados. `alerta` es "esto pide que alguien haga algo"; `error` es "algo
+   * salio mal". Mezclarlos hace que el naranja deje de significar que hay
+   * alguien esperando. */
+  --alerta: light-dark(#96580f, #d9a251);
+  --alerta-suave: light-dark(#fbf2e3, #2a2113);
+  --error: light-dark(#a32a21, #e88b80);
+  --error-suave: light-dark(#fbeeec, #2c1a17);
+  --ok: light-dark(#2a7a4f, #7fc9a0);
+  --ok-suave: light-dark(#eaf2ed, #17281f);
+
+  /* Forma. Papel respira: filas altas y esquinas generosas. */
+  --fila-y: 0.9375rem;
+  --radio-panel: 0.75rem;
+  --radio-control: 0.625rem;
+
+  --sombra-panel: 0 1px 2px light-dark(rgba(26, 26, 23, 0.04), rgba(0, 0, 0, 0.3));
+  --sombra-flotante: 0 12px 32px -12px light-dark(rgba(26, 26, 23, 0.22), rgba(0, 0, 0, 0.75));
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --fondo: #191918;
-    --superficie: #212120;
-    --superficie-2: #2a2a28;
-    --borde: #333331;
-    --borde-fuerte: #45443f;
+/* ---------------------------------------------------------------------------
+ * CONSOLA — el panel de la agencia.
+ *
+ * Grises con sesgo frio y un acento petroleo. No es azul SaaS a proposito: el
+ * azul generico es lo que hace que un panel parezca una plantilla.
+ * ------------------------------------------------------------------------ */
+[data-piel="consola"] {
+  --fondo: light-dark(#eef1f3, #0c1215);
+  --superficie: light-dark(#ffffff, #131b1f);
+  --superficie-2: light-dark(#e6eaed, #1a2429);
+  --borde: light-dark(#d6dde1, #253238);
+  --borde-fuerte: light-dark(#bcc6cc, #35464e);
 
-    --texto: #ededec;
-    --texto-suave: #a1a09b;
-    --texto-tenue: #78776f;
+  --texto: light-dark(#0d1418, #e4eef2);
+  --texto-suave: light-dark(#56666e, #93a5ad);
+  --texto-tenue: light-dark(#8a969d, #67777f);
 
-    --acento: #6098f5;
-    --acento-fuerte: #8ab4f8;
-    --acento-suave: #17233a;
+  --acento: light-dark(#0e6e8c, #4fc3e8);
+  --acento-fuerte: light-dark(#0a5670, #7ad5f2);
+  --acento-suave: light-dark(#e2f0f5, #0f2e3a);
+  --sobre-acento: light-dark(#ffffff, #08161c);
 
-    --alerta: #e3b341;
-    --alerta-suave: #2a2416;
-    --error: #f98a8a;
-    --error-suave: #2d1a1a;
-    --ok: #7ee2a8;
-    --ok-suave: #172a1f;
-  }
+  --alerta: light-dark(#a25709, #e2ab52);
+  --alerta-suave: light-dark(#fdf1e0, #2a2113);
+  --error: light-dark(#b02a20, #f18b80);
+  --error-suave: light-dark(#fdeceb, #2c1616);
+  --ok: light-dark(#10704b, #57c98d);
+  --ok-suave: light-dark(#e4f4ec, #10291f);
+
+  /* Forma. La consola es densa: la misma lista entra con varias filas mas. */
+  --fila-y: 0.6875rem;
+  --radio-panel: 0.5rem;
+  --radio-control: 0.3125rem;
+
+  --sombra-panel: 0 1px 2px light-dark(rgba(13, 20, 24, 0.05), rgba(0, 0, 0, 0.4));
+  --sombra-flotante: 0 12px 32px -12px light-dark(rgba(13, 20, 24, 0.28), rgba(0, 0, 0, 0.8));
 }
 
+/* ---------------------------------------------------------------------------
+ * De token a utilidad de Tailwind.
+ *
+ * `inline` hace que Tailwind emita `var(--fondo)` adentro de la clase en vez
+ * de copiar el valor: es lo que permite que `bg-fondo` signifique una cosa
+ * adentro del panel y otra adentro del portal, sin generar dos clases.
+ * ------------------------------------------------------------------------ */
 @theme inline {
   --color-fondo: var(--fondo);
   --color-superficie: var(--superficie);
@@ -82,6 +151,7 @@
   --color-acento: var(--acento);
   --color-acento-fuerte: var(--acento-fuerte);
   --color-acento-suave: var(--acento-suave);
+  --color-sobre-acento: var(--sobre-acento);
 
   --color-alerta: var(--alerta);
   --color-alerta-suave: var(--alerta-suave);
@@ -90,24 +160,49 @@
   --color-ok: var(--ok);
   --color-ok-suave: var(--ok-suave);
 
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  /* `py-fila` es la densidad de la piel: alta en papel, corta en consola. */
+  --spacing-fila: var(--fila-y);
+
+  --radius-panel: var(--radio-panel);
+  --radius-control: var(--radio-control);
+
+  --shadow-panel: var(--sombra-panel);
+  --shadow-flotante: var(--sombra-flotante);
+
+  /* Las fuentes las inyecta el layout de cada piel: cada lado carga las suyas
+   * y ninguna pantalla descarga tipografia que no va a usar. */
+  --font-sans: var(--fuente-cuerpo);
+  --font-titulo: var(--fuente-titulo);
+  --font-mono: var(--fuente-datos);
 }
 
+/* ---------------------------------------------------------------------------
+ * La base del documento.
+ * ------------------------------------------------------------------------ */
 body {
   background: var(--fondo);
   color: var(--texto);
-  /* ★ Aca habia un `font-family: Arial` que pisaba la fuente: el proyecto
-   * descargaba Geist en cada visita y despues mostraba todo en Arial. */
-  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  /* ★ Aca hubo una vez un `font-family: Arial` que pisaba la fuente: el
+   * proyecto descargaba la tipografia en cada visita y despues mostraba todo
+   * en Arial. */
+  font-family: var(--fuente-cuerpo), ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Los numeros que van en columna -horas, contadores, importes- se leen
+ * alineados. Es el detalle que separa una tabla de una lista de texto. */
+.tabular {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
 }
 
 /* ★ En un monitor grande, todo un escalon mas grande.
  *
- * Tailwind mide en rem, asi que mover el tamanio base del documento sube texto,
- * padding, alturas y separaciones a la vez y en proporcion: no hay que tocar
- * ninguna pantalla. En una notebook queda exactamente como estaba; el problema
- * era solo que en 27 pulgadas la misma interfaz se veia diminuta. */
+ * Tailwind mide en rem, asi que mover el tamanio base del documento sube
+ * texto, padding, alturas y separaciones a la vez y en proporcion: no hay que
+ * tocar ninguna pantalla. En una notebook queda exactamente como estaba; el
+ * problema era solo que en 27 pulgadas la misma interfaz se veia diminuta. */
 @media (min-width: 1536px) {
   html {
     font-size: 17px;
@@ -125,4 +220,18 @@ body {
 :focus-visible {
   outline: 2px solid var(--acento);
   outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* Nada se mueve para quien pidio que nada se mueva. Va aca y una sola vez, en
+ * vez de un `motion-reduce:` colgado de cada transicion. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
